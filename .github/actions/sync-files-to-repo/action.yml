@@ -248,19 +248,17 @@ runs:
           2>&1) || true
 
         if echo "$existing_branch" | jq -e '.object.sha' > /dev/null 2>&1; then
-          echo "   Branch exists, updating..."
-          branch_sha=$(echo "$existing_branch" | jq -r '.object.sha')
+          echo "   Branch exists, will override commits..."
         else
           echo "   Creating branch: $branch_name"
           # Create branch from default branch HEAD
           gh api "repos/$ORG/$REPO/git/refs" \
             -f ref="refs/heads/$branch_name" \
             -f sha="$base_sha" > /dev/null
-          branch_sha="$base_sha"
         fi
 
-        # Create commits for each file
-        current_sha="$branch_sha"
+        # Always start from base to override previous commits
+        current_sha="$base_sha"
 
         for change_json in "${changes[@]}"; do
           file_path=$(echo "$change_json" | jq -r '.path')
@@ -339,15 +337,13 @@ runs:
           updated_list="- None"$'\n'
         fi
 
-        # Workflow run URL
-        workflow_url="https://github.com/$ORG/$SOURCE_REPO/actions/runs/${GITHUB_RUN_ID}"
-
         # Build PR body
+        run_url="https://github.com/$ORG/$SOURCE_REPO/actions/runs/${GITHUB_RUN_ID}"
         pr_body="Syncs organization files from [\`$ORG/$SOURCE_REPO\`](https://github.com/$ORG/$SOURCE_REPO)."
         pr_body="${pr_body}"$'\n\n'"## Files Created"$'\n\n'"${created_list}"
         pr_body="${pr_body}"$'\n'"## Files Updated"$'\n\n'"${updated_list}"
-        pr_body="${pr_body}"$'\n'"---"$'\n\n'"**Workflow Run:** ${workflow_url}"
-        pr_body="${pr_body}"$'\n\n'"*This PR was automatically created by the org file sync workflow.*"
+        pr_body="${pr_body}"$'\n'"---"$'\n\n'
+        pr_body="${pr_body}[Sync Files (#${GITHUB_RUN_ID})](${run_url})"
 
         # Check for existing PR
         existing_pr=$(gh pr list --repo "$ORG/$REPO" \
