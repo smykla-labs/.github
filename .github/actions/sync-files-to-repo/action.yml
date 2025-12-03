@@ -289,55 +289,52 @@ runs:
             -f sha="$base_sha" > /dev/null
         fi
 
-        # Always start from base to override previous commits
-        current_sha="$base_sha"
-
+        # Create all blobs first
+        echo "   Creating blobs..."
+        tree_entries=()
         for change_json in "${changes[@]}"; do
           file_path=$(echo "$change_json" | jq -r '.path')
           encoded=$(echo "$change_json" | jq -r '.content')
-          action=$(echo "$change_json" | jq -r '.action')
 
-          echo "   Committing: $file_path"
-
-          # Create blob
           blob_sha=$(gh api "repos/$ORG/$REPO/git/blobs" \
             -f content="$encoded" \
             -f encoding="base64" \
             --jq '.sha')
 
-          # Get current tree
-          current_tree=$(gh api "repos/$ORG/$REPO/git/commits/$current_sha" \
-            --jq '.tree.sha')
-
-          # Create new tree with file
-          tree_json=$(jq -n \
-            --arg base "$current_tree" \
+          tree_entries+=("$(jq -n \
             --arg path "$file_path" \
             --arg blob "$blob_sha" \
-            '{
-              base_tree: $base,
-              tree: [{
-                path: $path,
-                mode: "100644",
-                type: "blob",
-                sha: $blob
-              }]
-            }')
-          new_tree=$(echo "$tree_json" | \
-            gh api "repos/$ORG/$REPO/git/trees" --input - --jq '.sha')
-
-          # Create commit
-          commit_msg="$COMMIT_PREFIX $action $file_path"
-          new_commit=$(gh api "repos/$ORG/$REPO/git/commits" \
-            --input <(jq -n \
-              --arg msg "$commit_msg" \
-              --arg tree "$new_tree" \
-              --arg parent "$current_sha" \
-              '{message: $msg, tree: $tree, parents: [$parent]}') \
-            --jq '.sha')
-
-          current_sha="$new_commit"
+            '{path: $path, mode: "100644", type: "blob", sha: $blob}')")
         done
+
+        # Get base tree
+        base_tree=$(gh api "repos/$ORG/$REPO/git/commits/$base_sha" \
+          --jq '.tree.sha')
+
+        # Build tree JSON with all files
+        tree_array=$(printf '%s\n' "${tree_entries[@]}" | jq -s '.')
+        tree_json=$(jq -n \
+          --arg base "$base_tree" \
+          --argjson tree "$tree_array" \
+          '{base_tree: $base, tree: $tree}')
+
+        # Create single tree with all changes
+        echo "   Creating tree with all changes..."
+        new_tree=$(echo "$tree_json" | \
+          gh api "repos/$ORG/$REPO/git/trees" --input - --jq '.sha')
+
+        # Create single commit
+        commit_msg="$COMMIT_PREFIX sync organization files"
+        echo "   Creating commit..."
+        new_commit=$(gh api "repos/$ORG/$REPO/git/commits" \
+          --input <(jq -n \
+            --arg msg "$commit_msg" \
+            --arg tree "$new_tree" \
+            --arg parent "$base_sha" \
+            '{message: $msg, tree: $tree, parents: [$parent]}') \
+          --jq '.sha')
+
+        current_sha="$new_commit"
 
         # Update branch ref (force-with-lease to override previous commits)
         gh api "repos/$ORG/$REPO/git/refs/heads/$branch_name" \
@@ -424,9 +421,34 @@ runs:
 
           if [ -n "$pr_url" ]; then
             echo "   Created PR: $pr_url"
+            # Extract PR number from URL
+            pr_number=$(echo "$pr_url" | grep -oE '[0-9]+$')
           else
             echo "   ❌ Failed to create PR"
           fi
+        fi
+
+        # Enable auto-merge with squash
+        if [ -n "$pr_number" ]; then
+          echo "   Enabling auto-merge (squash)..."
+          pr_node_id=$(gh api "repos/$ORG/$REPO/pulls/$pr_number" \
+            --jq '.node_id')
+
+          gh api graphql \
+            -f query='mutation($prId: ID!) {
+              enablePullRequestAutoMerge(input: {
+                pullRequestId: $prId,
+                mergeMethod: SQUASH
+              }) {
+                pullRequest {
+                  autoMergeRequest {
+                    enabledAt
+                  }
+                }
+              }
+            }' \
+            -f prId="$pr_node_id" > /dev/null 2>&1 || \
+            echo "   ⚠️  Could not enable auto-merge (may require approval or checks)"
         fi
 
         echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"
