@@ -221,10 +221,28 @@ runs:
         echo "skipped=$skipped" >> "$GITHUB_OUTPUT"
         echo "excluded=$excluded" >> "$GITHUB_OUTPUT"
 
-        # If no changes, exit
+        # If no changes, check for existing PR and close it
         if [ ${#changes[@]} -eq 0 ]; then
           echo ""
           echo "✅ No changes needed"
+
+          # Check if there's an existing PR to close
+          repo_sanitized="${REPO#.}"
+          branch_name="${BRANCH_PREFIX}/${repo_sanitized}"
+          existing_pr=$(gh pr list --repo "$ORG/$REPO" \
+            --head "$branch_name" \
+            --state open \
+            --json number \
+            --jq '.[0].number') || existing_pr=""
+
+          if [ -n "$existing_pr" ] && [ "$existing_pr" != "null" ]; then
+            echo "   Closing PR #$existing_pr (files are now in sync)"
+            gh pr close "$existing_pr" \
+              --repo "$ORG/$REPO" \
+              --comment "All files are now in sync. Closing this PR." \
+              2>&1 || true
+          fi
+
           echo "pr_url=" >> "$GITHUB_OUTPUT"
           exit 0
         fi
