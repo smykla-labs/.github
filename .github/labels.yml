@@ -99,15 +99,15 @@
 # Smyklot automation labels
 # =============================================================================
 - name: "smyklot:pending-ci"
-  color: "FEF2C0"
+  color: "fef2c0"
   description: "Pending CI - merge commit"
 
 - name: "smyklot:pending-ci:squash"
-  color: "FEF2C0"
+  color: "fef2c0"
   description: "Pending CI - squash merge"
 
 - name: "smyklot:pending-ci:rebase"
-  color: "FEF2C0"
+  color: "fef2c0"
   description: "Pending CI - rebase merge"
 
 # =============================================================================

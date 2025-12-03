@@ -3,21 +3,19 @@ name: Sync Files
 on:
   push:
     branches: [main]
-    paths:
-      - "templates/**"
+    paths: ["templates/**"]
   workflow_dispatch:
     inputs:
       dry_run:
         description: "Dry run (no changes)"
         required: false
-        default: "false"
         type: boolean
 
 permissions: {}
 
 jobs:
   get-repos:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       repos: ${{ steps.repos.outputs.repos }}
     steps:
@@ -39,7 +37,7 @@ jobs:
 
   sync-files:
     needs: get-repos
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
