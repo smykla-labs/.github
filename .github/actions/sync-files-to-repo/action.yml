@@ -416,34 +416,12 @@ runs:
           done
 
           if [ "$content_changed" = "false" ]; then
-            echo "   ✓ Branch content unchanged, skipping update"
-            echo "pr_url=" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "   ✓ Branch content unchanged, skipping branch update"
+            skip_branch_update=true
           fi
         fi
 
-        # Create single commit
-        commit_msg="$COMMIT_PREFIX sync organization files"
-        echo "   Creating commit..."
-        new_commit=$(gh api "repos/$ORG/$REPO/git/commits" \
-          --input <(jq -n \
-            --arg msg "$commit_msg" \
-            --arg tree "$new_tree" \
-            --arg parent "$base_sha" \
-            '{message: $msg, tree: $tree, parents: [$parent]}') \
-          --jq '.sha')
-
-        current_sha="$new_commit"
-
-        # Update branch ref (force-with-lease to override previous commits)
-        gh api "repos/$ORG/$REPO/git/refs/heads/$branch_name" \
-          -X PATCH \
-          -f sha="$current_sha" \
-          -F force=true > /dev/null
-
-        echo "   Branch updated to: ${current_sha:0:7}"
-
-        # Build PR title and body (used for both create and update)
+        # Build PR title and body (always, for both create and update)
         pr_title="chore(sync): sync organization files"
 
         # Build file lists for PR body
@@ -527,6 +505,67 @@ runs:
         pr_body="${pr_body}*This PR was automatically created by the org file sync workflow "
         pr_body="${pr_body}(run [#${GITHUB_RUN_ID}](${run_url}))*"
 
+        # Build labels array
+        IFS=',' read -ra label_array <<< "$PR_LABELS"
+        # Add review/destructive label if deletions present
+        if [ ${#deleted_files[@]} -gt 0 ]; then
+          label_array+=("review/destructive")
+        fi
+
+        # Handle content unchanged case - update PR metadata only
+        if [ "${skip_branch_update:-false}" = "true" ]; then
+          # Check for existing PR to update labels/body
+          existing_pr=$(gh pr list --repo "$ORG/$REPO" \
+            --head "$branch_name" \
+            --state open \
+            --json number,url \
+            --jq '.[0]') || existing_pr=""
+
+          if [ -n "$existing_pr" ] && [ "$existing_pr" != "null" ]; then
+            pr_number=$(echo "$existing_pr" | jq -r '.number')
+            pr_url=$(echo "$existing_pr" | jq -r '.url')
+
+            label_args=()
+            for label in "${label_array[@]}"; do
+              label_args+=(--add-label "$label")
+            done
+
+            gh pr edit "$pr_number" \
+              --repo "$ORG/$REPO" \
+              --title "$pr_title" \
+              --body "$pr_body" \
+              "${label_args[@]}" 2>&1 || true
+
+            echo "   Updated PR metadata: $pr_url"
+            echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"
+          else
+            echo "   No PR to update"
+            echo "pr_url=" >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
+        fi
+
+        # Create single commit
+        commit_msg="$COMMIT_PREFIX sync organization files"
+        echo "   Creating commit..."
+        new_commit=$(gh api "repos/$ORG/$REPO/git/commits" \
+          --input <(jq -n \
+            --arg msg "$commit_msg" \
+            --arg tree "$new_tree" \
+            --arg parent "$base_sha" \
+            '{message: $msg, tree: $tree, parents: [$parent]}') \
+          --jq '.sha')
+
+        current_sha="$new_commit"
+
+        # Update branch ref (force-with-lease to override previous commits)
+        gh api "repos/$ORG/$REPO/git/refs/heads/$branch_name" \
+          -X PATCH \
+          -f sha="$current_sha" \
+          -F force=true > /dev/null
+
+        echo "   Branch updated to: ${current_sha:0:7}"
+
         # Check for existing PR
         existing_pr=$(gh pr list --repo "$ORG/$REPO" \
           --head "$branch_name" \
@@ -539,12 +578,7 @@ runs:
           pr_number=$(echo "$existing_pr" | jq -r '.number')
           pr_url=$(echo "$existing_pr" | jq -r '.url')
 
-          # Parse labels for update
-          IFS=',' read -ra label_array <<< "$PR_LABELS"
-          # Add review/destructive label if deletions present
-          if [ ${#deleted_files[@]} -gt 0 ]; then
-            label_array+=("review/destructive")
-          fi
+          # Build label args for update (uses pre-built label_array)
           label_args=()
           for label in "${label_array[@]}"; do
             label_args+=(--add-label "$label")
@@ -558,13 +592,7 @@ runs:
 
           echo "   Updated existing PR: $pr_url"
         else
-
-          # Parse labels
-          IFS=',' read -ra label_array <<< "$PR_LABELS"
-          # Add review/destructive label if deletions present
-          if [ ${#deleted_files[@]} -gt 0 ]; then
-            label_array+=("review/destructive")
-          fi
+          # Build label args for create (uses pre-built label_array)
           label_args=()
           for label in "${label_array[@]}"; do
             label_args+=(--label "$label")
