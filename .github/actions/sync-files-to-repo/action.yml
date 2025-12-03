@@ -353,19 +353,12 @@ runs:
           # Workflow run URL
           workflow_url="https://github.com/$ORG/$SOURCE_REPO/actions/runs/${GITHUB_RUN_ID}"
 
-          pr_body="Syncs organization files from [\`$ORG/$SOURCE_REPO\`](https://github.com/$ORG/$SOURCE_REPO).
-
-## Files Created
-
-${created_list}
-## Files Updated
-
-${updated_list}
----
-
-**Workflow Run:** ${workflow_url}
-
-*This PR was automatically created by the org file sync workflow.*"
+          # Build PR body
+          pr_body="Syncs organization files from [\`$ORG/$SOURCE_REPO\`](https://github.com/$ORG/$SOURCE_REPO)."
+          pr_body="${pr_body}"$'\n\n'"## Files Created"$'\n\n'"${created_list}"
+          pr_body="${pr_body}"$'\n'"## Files Updated"$'\n\n'"${updated_list}"
+          pr_body="${pr_body}"$'\n'"---"$'\n\n'"**Workflow Run:** ${workflow_url}"
+          pr_body="${pr_body}"$'\n\n'"*This PR was automatically created by the org file sync workflow.*"
 
           # Parse labels
           IFS=',' read -ra label_array <<< "$PR_LABELS"
