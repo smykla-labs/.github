@@ -77,14 +77,10 @@ Both workflows use the **smyklot** GitHub App for authentication:
 
 ### Adding New Sync Files
 
-1. Add file to `templates/` directory
-2. Update `FILES` array in `.github/workflows/sync-files.yml`:
-   ```bash
-   declare -A FILES=(
-     ["templates/path/file.md"]="path/file.md"
-   )
-   ```
-3. Commit and push to `main` - syncs automatically to all repos
+1. Add file to `templates/` directory (preserving the desired path structure)
+2. Commit and push to `main` - syncs automatically to all repos
+
+Note: The workflow automatically discovers all files in `templates/` - no manual configuration needed.
 
 ### Per-Repo Configuration
 
@@ -125,6 +121,7 @@ Trigger workflows manually via GitHub Actions:
 #### File Sync
 
 - Processes all repos in parallel (fail-fast: false)
+- Automatically discovers all files in `templates/` directory
 - Compares content hash to determine if sync needed
 - Creates branch: `chore/file-sync-YYYYMMDDHHMMSS`
 - Creates PR with changes (with `file-sync` label)

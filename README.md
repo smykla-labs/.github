@@ -89,9 +89,8 @@ files:
 
 ### Adding New Sync Files
 
-1. Add the file to `templates/` directory
-2. Update the `FILES` array in `.github/workflows/sync-files.yml`
-3. Commit and push to `main`
+1. Add the file to `templates/` directory (preserving the desired path structure)
+2. Commit and push to `main` - syncs automatically to all repos
 
 ## Setup
 
