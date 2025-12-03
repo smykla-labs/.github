@@ -94,7 +94,7 @@ jobs:
           ALLOW_ADDITIONAL: ${{ steps.config.outputs.allow_additional }}
         run: |
           # Read desired labels from config
-          desired_labels=$(yq eval -o json '.[] | {name: .name, color: .color, description: (.description // "")}' .github/labels.yml | jq -s '.')
+          desired_labels=$(yq eval -o json '.[]' .github/labels.yml | jq -s '.')
 
           # Filter out disabled labels
           desired_labels=$(echo "$desired_labels" | jq --argjson disabled "$DISABLED_LABELS" \
