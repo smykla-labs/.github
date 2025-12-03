@@ -389,6 +389,40 @@ runs:
         new_tree=$(echo "$tree_json" | \
           gh api "repos/$ORG/$REPO/git/trees" --input - --jq '.sha')
 
+        # Check if existing branch has identical content (compare file blobs)
+        if echo "$existing_branch" | jq -e '.object.sha' > /dev/null 2>&1; then
+          existing_sha=$(echo "$existing_branch" | jq -r '.object.sha')
+          content_changed=false
+
+          # Compare each file's blob SHA with existing branch
+          for entry_json in "${tree_entries[@]}"; do
+            file_path=$(echo "$entry_json" | jq -r '.path')
+            new_blob=$(echo "$entry_json" | jq -r '.sha')
+
+            # Get existing file's blob SHA from PR branch
+            existing_blob=$(gh api "repos/$ORG/$REPO/contents/$file_path" \
+              -f ref="$branch_name" \
+              --jq '.sha' 2>/dev/null) || existing_blob=""
+
+            # Compare blobs (null for deletions means file shouldn't exist)
+            if [ "$new_blob" = "null" ]; then
+              if [ -n "$existing_blob" ]; then
+                content_changed=true
+                break
+              fi
+            elif [ "$new_blob" != "$existing_blob" ]; then
+              content_changed=true
+              break
+            fi
+          done
+
+          if [ "$content_changed" = "false" ]; then
+            echo "   ✓ Branch content unchanged, skipping update"
+            echo "pr_url=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+        fi
+
         # Create single commit
         commit_msg="$COMMIT_PREFIX sync organization files"
         echo "   Creating commit..."
