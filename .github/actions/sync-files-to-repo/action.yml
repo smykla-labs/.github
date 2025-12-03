@@ -234,8 +234,9 @@ runs:
         echo ""
         echo "🔧 Creating PR with changes..."
 
-        # Branch name
-        branch_name="${BRANCH_PREFIX}/${REPO}"
+        # Branch name - sanitize repo name (strip leading dots)
+        repo_sanitized="${REPO#.}"
+        branch_name="${BRANCH_PREFIX}/${repo_sanitized}"
 
         # Check if branch exists
         existing_branch=$(gh api "repos/$ORG/$REPO/git/ref/heads/$branch_name" \
