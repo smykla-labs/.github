@@ -207,10 +207,29 @@ runs:
             # This file is allowed to be customized per-repo, so we detect manual
             # modifications and exclude it from sync if found. This prevents
             # overwriting repo-specific Renovate configurations.
+            # Also check if repo has renovate config in OTHER locations and warn.
             # DO NOT add other files here without explicit approval.
-            if [ "$dest_path" = "renovate.json" ] || \
-               [ "$dest_path" = ".github/renovate.json" ]; then
+            if [ "$dest_path" = "renovate.json" ]; then
               echo "      🔍 Checking for manual modifications (renovate.json only)..."
+
+              # Check for renovate config in other locations (takes priority over root)
+              other_configs=()
+              for other_path in ".github/renovate.json" ".github/renovate.json5" \
+                                "renovate.json5" ".renovaterc" ".renovaterc.json" \
+                                ".renovaterc.json5"; do
+                if gh api "repos/$ORG/$REPO/contents/$other_path" > /dev/null 2>&1; then
+                  other_configs+=("$other_path")
+                fi
+              done
+
+              if [ ${#other_configs[@]} -gt 0 ]; then
+                echo "      ⚠️  Renovate config found in other location(s), excluding from sync"
+                echo "      💡 Found: ${other_configs[*]}"
+                echo "      💡 Recommend moving to renovate.json in root"
+                modified_excluded=$((modified_excluded + 1))
+                modified_excluded_files+=("$dest_path (config exists at: ${other_configs[*]})")
+                continue
+              fi
 
               # Get commit history for this file (last 20 commits)
               commits=$(gh api "repos/$ORG/$REPO/commits" \
