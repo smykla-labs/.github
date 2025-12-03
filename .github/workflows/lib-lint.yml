@@ -43,6 +43,16 @@ on:
         required: false
         type: string
         default: ""
+      skip-all:
+        description: "Skip all checks (ci/skip-all label)"
+        required: false
+        type: boolean
+        default: false
+      skip-lint:
+        description: "Skip lint checks (ci/skip-lint label)"
+        required: false
+        type: boolean
+        default: false
     outputs:
       lint-passed:
         description: "Whether all enabled linters passed"
@@ -53,7 +63,7 @@ permissions:
 
 jobs:
   golangci-lint:
-    if: inputs.enable-golangci-lint
+    if: inputs.enable-golangci-lint && !inputs.skip-all && !inputs.skip-lint
     runs-on: ubuntu-24.04
     outputs:
       passed: ${{ steps.lint.outcome == 'success' }}
@@ -75,7 +85,7 @@ jobs:
           args: ${{ inputs.golangci-lint-args }}
 
   yamllint:
-    if: inputs.enable-yamllint
+    if: inputs.enable-yamllint && !inputs.skip-all && !inputs.skip-lint
     runs-on: ubuntu-24.04
     outputs:
       passed: ${{ steps.lint.outcome == 'success' }}
@@ -90,7 +100,7 @@ jobs:
           yamllint .
 
   shellcheck:
-    if: inputs.enable-shellcheck
+    if: inputs.enable-shellcheck && !inputs.skip-all && !inputs.skip-lint
     runs-on: ubuntu-24.04
     outputs:
       passed: ${{ steps.lint.outcome == 'success' }}
@@ -104,7 +114,7 @@ jobs:
           find . -name "*.sh" -type f -print0 | xargs -0 shellcheck
 
   markdownlint:
-    if: inputs.enable-markdownlint
+    if: inputs.enable-markdownlint && !inputs.skip-all && !inputs.skip-lint
     runs-on: ubuntu-24.04
     outputs:
       passed: ${{ steps.lint.outcome == 'success' }}

@@ -38,6 +38,16 @@ on:
         required: false
         type: string
         default: "-s -w"
+      skip-all:
+        description: "Skip all checks (ci/skip-all label)"
+        required: false
+        type: boolean
+        default: false
+      skip-build:
+        description: "Skip build checks (ci/skip-build label)"
+        required: false
+        type: boolean
+        default: false
     outputs:
       artifact-name:
         description: "Name of uploaded artifact"
@@ -48,6 +58,7 @@ permissions:
 
 jobs:
   build:
+    if: "!inputs.skip-all && !inputs.skip-build"
     runs-on: ubuntu-24.04
     outputs:
       artifact-name: ${{ inputs.artifact-name }}

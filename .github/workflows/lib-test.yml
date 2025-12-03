@@ -33,6 +33,16 @@ on:
         required: false
         type: string
         default: "10m"
+      skip-all:
+        description: "Skip all checks (ci/skip-all label)"
+        required: false
+        type: boolean
+        default: false
+      skip-tests:
+        description: "Skip test checks (ci/skip-tests label)"
+        required: false
+        type: boolean
+        default: false
     outputs:
       coverage-percent:
         description: "Code coverage percentage"
@@ -43,6 +53,7 @@ permissions:
 
 jobs:
   test:
+    if: "!inputs.skip-all && !inputs.skip-tests"
     runs-on: ubuntu-24.04
     outputs:
       coverage: ${{ steps.coverage.outputs.percent }}

@@ -309,13 +309,45 @@ runs:
           current_sha="$new_commit"
         done
 
-        # Update branch ref
+        # Update branch ref (force-with-lease to override previous commits)
         gh api "repos/$ORG/$REPO/git/refs/heads/$branch_name" \
           -X PATCH \
           -f sha="$current_sha" \
           -F force=true > /dev/null
 
         echo "   Branch updated to: ${current_sha:0:7}"
+
+        # Build PR title and body (used for both create and update)
+        pr_title="chore(sync): sync organization files"
+
+        # Build file lists for PR body
+        created_list=""
+        if [ ${#created_files[@]} -gt 0 ]; then
+          for file in "${created_files[@]}"; do
+            created_list="${created_list}- \`${file}\`"$'\n'
+          done
+        else
+          created_list="- None"$'\n'
+        fi
+
+        updated_list=""
+        if [ ${#updated_files[@]} -gt 0 ]; then
+          for file in "${updated_files[@]}"; do
+            updated_list="${updated_list}- \`${file}\`"$'\n'
+          done
+        else
+          updated_list="- None"$'\n'
+        fi
+
+        # Workflow run URL
+        workflow_url="https://github.com/$ORG/$SOURCE_REPO/actions/runs/${GITHUB_RUN_ID}"
+
+        # Build PR body
+        pr_body="Syncs organization files from [\`$ORG/$SOURCE_REPO\`](https://github.com/$ORG/$SOURCE_REPO)."
+        pr_body="${pr_body}"$'\n\n'"## Files Created"$'\n\n'"${created_list}"
+        pr_body="${pr_body}"$'\n'"## Files Updated"$'\n\n'"${updated_list}"
+        pr_body="${pr_body}"$'\n'"---"$'\n\n'"**Workflow Run:** ${workflow_url}"
+        pr_body="${pr_body}"$'\n\n'"*This PR was automatically created by the org file sync workflow.*"
 
         # Check for existing PR
         existing_pr=$(gh pr list --repo "$ORG/$REPO" \
@@ -325,40 +357,25 @@ runs:
           --jq '.[0]') || existing_pr=""
 
         if [ -n "$existing_pr" ] && [ "$existing_pr" != "null" ]; then
+          # Update existing PR
+          pr_number=$(echo "$existing_pr" | jq -r '.number')
           pr_url=$(echo "$existing_pr" | jq -r '.url')
+
+          # Parse labels for update
+          IFS=',' read -ra label_array <<< "$PR_LABELS"
+          label_args=()
+          for label in "${label_array[@]}"; do
+            label_args+=(--add-label "$label")
+          done
+
+          gh pr edit "$pr_number" \
+            --repo "$ORG/$REPO" \
+            --title "$pr_title" \
+            --body "$pr_body" \
+            "${label_args[@]}" 2>&1 || true
+
           echo "   Updated existing PR: $pr_url"
         else
-          # Create PR
-          pr_title="chore(sync): sync organization files"
-
-          # Build file lists for PR body
-          created_list=""
-          if [ ${#created_files[@]} -gt 0 ]; then
-            for file in "${created_files[@]}"; do
-              created_list="${created_list}- \`${file}\`"$'\n'
-            done
-          else
-            created_list="- None"$'\n'
-          fi
-
-          updated_list=""
-          if [ ${#updated_files[@]} -gt 0 ]; then
-            for file in "${updated_files[@]}"; do
-              updated_list="${updated_list}- \`${file}\`"$'\n'
-            done
-          else
-            updated_list="- None"$'\n'
-          fi
-
-          # Workflow run URL
-          workflow_url="https://github.com/$ORG/$SOURCE_REPO/actions/runs/${GITHUB_RUN_ID}"
-
-          # Build PR body
-          pr_body="Syncs organization files from [\`$ORG/$SOURCE_REPO\`](https://github.com/$ORG/$SOURCE_REPO)."
-          pr_body="${pr_body}"$'\n\n'"## Files Created"$'\n\n'"${created_list}"
-          pr_body="${pr_body}"$'\n'"## Files Updated"$'\n\n'"${updated_list}"
-          pr_body="${pr_body}"$'\n'"---"$'\n\n'"**Workflow Run:** ${workflow_url}"
-          pr_body="${pr_body}"$'\n\n'"*This PR was automatically created by the org file sync workflow.*"
 
           # Parse labels
           IFS=',' read -ra label_array <<< "$PR_LABELS"
