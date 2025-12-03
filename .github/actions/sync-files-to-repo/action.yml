@@ -51,6 +51,9 @@ outputs:
   updated:
     description: Number of files updated
     value: ${{ steps.sync.outputs.updated }}
+  deleted:
+    description: Number of files deleted
+    value: ${{ steps.sync.outputs.deleted }}
   skipped:
     description: Number of files skipped
     value: ${{ steps.sync.outputs.skipped }}
@@ -142,10 +145,12 @@ runs:
         skipped=0
         excluded=0
         modified_excluded=0
+        deleted=0
         changes=()
         created_files=()
         updated_files=()
         modified_excluded_files=()
+        deleted_files=()
 
         # Get default branch for target repo
         default_branch=$(gh api "repos/$ORG/$REPO" --jq '.default_branch')
@@ -187,6 +192,24 @@ runs:
             jq -r '.content' | base64 -d)
           source_sha=$(echo "$source_response" | jq -r '.sha')
 
+          # SPECIAL CASE: renovate.json migration
+          # Check for renovate config in other locations and schedule deletion
+          # This runs BEFORE checking if root renovate.json exists
+          if [ "$dest_path" = "renovate.json" ]; then
+            echo "      🔍 Checking for non-standard renovate configs..."
+
+            for other_path in ".github/renovate.json" ".github/renovate.json5" "renovate.json5" ".renovaterc" ".renovaterc.json" ".renovaterc.json5"; do
+              if gh api "repos/$ORG/$REPO/contents/$other_path" > /dev/null 2>&1; then
+                echo "      🗑️  Scheduling deletion: $other_path (migrating to root)"
+                deleted=$((deleted + 1))
+                deleted_files+=("$other_path")
+                # Add deletion to changes
+                change_json=$(jq -n --arg path "$other_path" '{path: $path, action: "delete"}')
+                changes+=("$change_json")
+              fi
+            done
+          fi
+
           # Fetch target file from target repo
           target_response=$(gh api "repos/$ORG/$REPO/contents/$dest_path" \
             2>&1) || true
@@ -203,41 +226,17 @@ runs:
               continue
             fi
 
-            # SPECIAL CASE: renovate.json only
+            # SPECIAL CASE: renovate.json - check for manual modifications
             # This file is allowed to be customized per-repo, so we detect manual
-            # modifications and exclude it from sync if found. This prevents
-            # overwriting repo-specific Renovate configurations.
-            # Also check if repo has renovate config in OTHER locations and warn.
-            # DO NOT add other files here without explicit approval.
+            # modifications and exclude it from sync if found.
             if [ "$dest_path" = "renovate.json" ]; then
-              echo "      🔍 Checking for manual modifications (renovate.json only)..."
+              echo "      🔍 Checking for manual modifications..."
 
-              # Check for renovate config in other locations (takes priority over root)
-              other_configs=()
-              for other_path in ".github/renovate.json" ".github/renovate.json5" \
-                                "renovate.json5" ".renovaterc" ".renovaterc.json" \
-                                ".renovaterc.json5"; do
-                if gh api "repos/$ORG/$REPO/contents/$other_path" > /dev/null 2>&1; then
-                  other_configs+=("$other_path")
-                fi
-              done
-
-              if [ ${#other_configs[@]} -gt 0 ]; then
-                echo "      ⚠️  Renovate config found in other location(s), excluding from sync"
-                echo "      💡 Found: ${other_configs[*]}"
-                echo "      💡 Recommend moving to renovate.json in root"
-                modified_excluded=$((modified_excluded + 1))
-                modified_excluded_files+=("$dest_path (config exists at: ${other_configs[*]})")
-                continue
-              fi
-
-              # Get commit history for this file (last 20 commits)
               commits=$(gh api "repos/$ORG/$REPO/commits" \
                 -f path="$dest_path" \
                 -f per_page=20 \
                 --jq '.[] | .commit.message' 2>&1) || commits=""
 
-              # Check if there are any commits that are NOT from sync workflow
               manual_commits=$(echo "$commits" | \
                 grep -v "^chore(sync):" || true)
 
@@ -278,6 +277,7 @@ runs:
         echo "📊 Summary:"
         echo "   Created: $created"
         echo "   Updated: $updated"
+        echo "   Deleted: $deleted"
         echo "   Skipped: $skipped (already up to date)"
         echo "   Excluded: $excluded (by repo config)"
         echo "   Modified & Excluded: $modified_excluded (manual changes detected)"
@@ -285,6 +285,7 @@ runs:
         # Output counts
         echo "created=$created" >> "$GITHUB_OUTPUT"
         echo "updated=$updated" >> "$GITHUB_OUTPUT"
+        echo "deleted=$deleted" >> "$GITHUB_OUTPUT"
         echo "skipped=$skipped" >> "$GITHUB_OUTPUT"
         echo "excluded=$excluded" >> "$GITHUB_OUTPUT"
         echo "modified_excluded=$modified_excluded" >> "$GITHUB_OUTPUT"
@@ -343,22 +344,33 @@ runs:
             -f sha="$base_sha" > /dev/null
         fi
 
-        # Create all blobs first
+        # Create blobs and prepare tree entries
         echo "   Creating blobs..."
         tree_entries=()
         for change_json in "${changes[@]}"; do
           file_path=$(echo "$change_json" | jq -r '.path')
-          encoded=$(echo "$change_json" | jq -r '.content')
+          action=$(echo "$change_json" | jq -r '.action // "update"')
 
-          blob_sha=$(gh api "repos/$ORG/$REPO/git/blobs" \
-            -f content="$encoded" \
-            -f encoding="base64" \
-            --jq '.sha')
+          if [ "$action" = "delete" ]; then
+            # For deletions, add tree entry with null sha
+            echo "      Deleting: $file_path"
+            tree_entries+=("$(jq -n \
+              --arg path "$file_path" \
+              '{path: $path, mode: "100644", type: "blob", sha: null}')")
+          else
+            # For creates/updates, create blob
+            encoded=$(echo "$change_json" | jq -r '.content')
 
-          tree_entries+=("$(jq -n \
-            --arg path "$file_path" \
-            --arg blob "$blob_sha" \
-            '{path: $path, mode: "100644", type: "blob", sha: $blob}')")
+            blob_sha=$(gh api "repos/$ORG/$REPO/git/blobs" \
+              -f content="$encoded" \
+              -f encoding="base64" \
+              --jq '.sha')
+
+            tree_entries+=("$(jq -n \
+              --arg path "$file_path" \
+              --arg blob "$blob_sha" \
+              '{path: $path, mode: "100644", type: "blob", sha: $blob}')")
+          fi
         done
 
         # Get base tree
@@ -420,25 +432,51 @@ runs:
           updated_list="- None"$'\n'
         fi
 
+        # Build deleted files list
+        deleted_list=""
+        if [ ${#deleted_files[@]} -gt 0 ]; then
+          for file in "${deleted_files[@]}"; do
+            deleted_list="${deleted_list}- \`${file}\`"$'\n'
+          done
+        else
+          deleted_list="- None"$'\n'
+        fi
+
+        # Build deleted files alert (if any deletions)
+        deleted_alert=""
+        if [ ${#deleted_files[@]} -gt 0 ]; then
+          deleted_alert=$'\n\n> [!CAUTION]\n'
+          deleted_alert="${deleted_alert}> **Files are being deleted in this sync.**"$'\n'
+          deleted_alert="${deleted_alert}> "$'\n'
+          deleted_alert="${deleted_alert}> The following non-standard Renovate config files are being removed"$'\n'
+          deleted_alert="${deleted_alert}> in favor of the organization standard \`renovate.json\` in root:"$'\n'
+          deleted_alert="${deleted_alert}> "$'\n'
+          for file in "${deleted_files[@]}"; do
+            deleted_alert="${deleted_alert}> - \`${file}\`"$'\n'
+          done
+          deleted_alert="${deleted_alert}> "$'\n'
+          deleted_alert="${deleted_alert}> **This PR requires manual review before merging.**"
+        fi
+
         # Build modified/excluded files alert
         modified_alert=""
         if [ ${#modified_excluded_files[@]} -gt 0 ]; then
-          modified_alert=$'\n\n'"> [!IMPORTANT]"$'\n'
-          modified_alert="${modified_alert}"> The following files have been manually modified and were excluded from this sync:"$'\n'
-          modified_alert="${modified_alert}""> "$'\n'
+          modified_alert=$'\n\n> [!IMPORTANT]\n'
+          modified_alert="${modified_alert}> The following files have been manually modified and were excluded from this sync:"$'\n'
+          modified_alert="${modified_alert}> "$'\n'
           for file in "${modified_excluded_files[@]}"; do
-            modified_alert="${modified_alert}""> - \`${file}\`"$'\n'
+            modified_alert="${modified_alert}>   - \`${file}\`"$'\n'
           done
-          modified_alert="${modified_alert}""> "$'\n'
-          modified_alert="${modified_alert}""> To permanently exclude these files from sync, add them to \`.github/sync-config.yml\`:"$'\n'
-          modified_alert="${modified_alert}""> \`\`\`yaml"$'\n'
-          modified_alert="${modified_alert}""> sync:"$'\n'
-          modified_alert="${modified_alert}">   files:"$'\n'
-          modified_alert="${modified_alert}">     exclude:"$'\n'
+          modified_alert="${modified_alert}> "$'\n'
+          modified_alert="${modified_alert}> To permanently exclude these files from sync, add them to \`.github/sync-config.yml\`:"$'\n'
+          modified_alert="${modified_alert}> \`\`\`yaml"$'\n'
+          modified_alert="${modified_alert}> sync:"$'\n'
+          modified_alert="${modified_alert}>   files:"$'\n'
+          modified_alert="${modified_alert}>     exclude:"$'\n'
           for file in "${modified_excluded_files[@]}"; do
-            modified_alert="${modified_alert}">       - ${file}"$'\n'
+            modified_alert="${modified_alert}>       - ${file}"$'\n'
           done
-          modified_alert="${modified_alert}""> \`\`\`"
+          modified_alert="${modified_alert}> \`\`\`"
         fi
 
         # Build PR body
@@ -446,6 +484,11 @@ runs:
         pr_body="Syncs organization files from [\`$ORG/$SOURCE_REPO\`](https://github.com/$ORG/$SOURCE_REPO)."
         pr_body="${pr_body}"$'\n\n'"## Files Created"$'\n\n'"${created_list}"
         pr_body="${pr_body}"$'\n'"## Files Updated"$'\n\n'"${updated_list}"
+        # Only show "Files Deleted" section if no alert (alert includes the list)
+        if [ ${#deleted_files[@]} -eq 0 ]; then
+          pr_body="${pr_body}"$'\n'"## Files Deleted"$'\n\n'"${deleted_list}"
+        fi
+        pr_body="${pr_body}${deleted_alert}"
         pr_body="${pr_body}${modified_alert}"
         pr_body="${pr_body}"$'\n\n'"---"$'\n\n'
         pr_body="${pr_body}*This PR was automatically created by the org file sync workflow "
@@ -504,27 +547,31 @@ runs:
           fi
         fi
 
-        # Enable auto-merge with squash
+        # Enable auto-merge with squash (skip if deletions present)
         if [ -n "$pr_number" ]; then
-          echo "   Enabling auto-merge (squash)..."
-          pr_node_id=$(gh api "repos/$ORG/$REPO/pulls/$pr_number" \
-            --jq '.node_id')
+          if [ ${#deleted_files[@]} -gt 0 ]; then
+            echo "   ⚠️  Skipping auto-merge (deletions require manual review)"
+          else
+            echo "   Enabling auto-merge (squash)..."
+            pr_node_id=$(gh api "repos/$ORG/$REPO/pulls/$pr_number" \
+              --jq '.node_id')
 
-          gh api graphql \
-            -f query='mutation($prId: ID!) {
-              enablePullRequestAutoMerge(input: {
-                pullRequestId: $prId,
-                mergeMethod: SQUASH
-              }) {
-                pullRequest {
-                  autoMergeRequest {
-                    enabledAt
+            gh api graphql \
+              -f query='mutation($prId: ID!) {
+                enablePullRequestAutoMerge(input: {
+                  pullRequestId: $prId,
+                  mergeMethod: SQUASH
+                }) {
+                  pullRequest {
+                    autoMergeRequest {
+                      enabledAt
+                    }
                   }
                 }
-              }
-            }' \
-            -f prId="$pr_node_id" > /dev/null 2>&1 || \
-            echo "   ⚠️  Could not enable auto-merge (may require approval or checks)"
+              }' \
+              -f prId="$pr_node_id" > /dev/null 2>&1 || \
+              echo "   ⚠️  Could not enable auto-merge (may require approval or checks)"
+          fi
         fi
 
         echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"

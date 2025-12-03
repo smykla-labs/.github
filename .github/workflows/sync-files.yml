@@ -127,6 +127,7 @@ jobs:
           REPO: ${{ matrix.repo }}
           CREATED: ${{ steps.sync.outputs.created }}
           UPDATED: ${{ steps.sync.outputs.updated }}
+          DELETED: ${{ steps.sync.outputs.deleted }}
           SKIPPED: ${{ steps.sync.outputs.skipped }}
           EXCLUDED: ${{ steps.sync.outputs.excluded }}
           MODIFIED_EXCLUDED: ${{ steps.sync.outputs.modified-excluded }}
@@ -139,6 +140,7 @@ jobs:
             echo "|:-------|------:|"
             echo "| Created | $CREATED |"
             echo "| Updated | $UPDATED |"
+            echo "| Deleted | $DELETED |"
             echo "| Skipped | $SKIPPED |"
             echo "| Excluded | $EXCLUDED |"
             echo "| Modified & Excluded | $MODIFIED_EXCLUDED |"
