@@ -335,7 +335,25 @@ runs:
           2>&1) || true
 
         if echo "$existing_branch" | jq -e '.object.sha' > /dev/null 2>&1; then
-          echo "   Branch exists, will override commits..."
+          # Branch exists - check if there's a merged PR
+          merged_pr=$(gh pr list --repo "$ORG/$REPO" \
+            --head "$branch_name" \
+            --state merged \
+            --json number \
+            --jq '.[0].number' 2>/dev/null) || merged_pr=""
+
+          if [ -n "$merged_pr" ] && [ "$merged_pr" != "null" ]; then
+            echo "   Branch has merged PR #$merged_pr, deleting branch..."
+            gh api "repos/$ORG/$REPO/git/refs/heads/$branch_name" -X DELETE 2>&1 || true
+            # Clear existing_branch so we create a fresh one
+            existing_branch=""
+            echo "   Creating fresh branch: $branch_name"
+            gh api "repos/$ORG/$REPO/git/refs" \
+              -f ref="refs/heads/$branch_name" \
+              -f sha="$base_sha" > /dev/null
+          else
+            echo "   Branch exists, will override commits..."
+          fi
         else
           echo "   Creating branch: $branch_name"
           # Create branch from default branch HEAD
@@ -545,33 +563,36 @@ runs:
 
             echo "   Updated PR metadata: $pr_url"
             echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"
+            exit 0
           else
-            echo "   No PR to update"
-            echo "pr_url=" >> "$GITHUB_OUTPUT"
+            echo "   No existing PR found, will create one"
+            # Don't exit - continue to PR creation below
           fi
-          exit 0
         fi
 
-        # Create single commit
-        commit_msg="$COMMIT_PREFIX sync organization files"
-        echo "   Creating commit..."
-        new_commit=$(gh api "repos/$ORG/$REPO/git/commits" \
-          --input <(jq -n \
-            --arg msg "$commit_msg" \
-            --arg tree "$new_tree" \
-            --arg parent "$base_sha" \
-            '{message: $msg, tree: $tree, parents: [$parent]}') \
-          --jq '.sha')
+        # Create/update branch only if content changed
+        if [ "${skip_branch_update:-false}" != "true" ]; then
+          # Create single commit
+          commit_msg="$COMMIT_PREFIX sync organization files"
+          echo "   Creating commit..."
+          new_commit=$(gh api "repos/$ORG/$REPO/git/commits" \
+            --input <(jq -n \
+              --arg msg "$commit_msg" \
+              --arg tree "$new_tree" \
+              --arg parent "$base_sha" \
+              '{message: $msg, tree: $tree, parents: [$parent]}') \
+            --jq '.sha')
 
-        current_sha="$new_commit"
+          current_sha="$new_commit"
 
-        # Update branch ref (force-with-lease to override previous commits)
-        gh api "repos/$ORG/$REPO/git/refs/heads/$branch_name" \
-          -X PATCH \
-          -f sha="$current_sha" \
-          -F force=true > /dev/null
+          # Update branch ref (force-with-lease to override previous commits)
+          gh api "repos/$ORG/$REPO/git/refs/heads/$branch_name" \
+            -X PATCH \
+            -f sha="$current_sha" \
+            -F force=true > /dev/null
 
-        echo "   Branch updated to: ${current_sha:0:7}"
+          echo "   Branch updated to: ${current_sha:0:7}"
+        fi
 
         # Check for existing PR
         existing_pr=$(gh pr list --repo "$ORG/$REPO" \
