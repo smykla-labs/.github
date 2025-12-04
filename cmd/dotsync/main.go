@@ -342,12 +342,8 @@ func main() {
 		kong.Name("orgsync"),
 		kong.Description("Organization sync tool for labels, files, and smyklot versions"),
 		kong.UsageOnError(),
-		kong.ConfigureHelp(kong.HelpOptions{
-			Compact: true,
-		}),
-		kong.Vars{
-			"version": version,
-		},
+		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
+		kong.Vars{"version": version},
 		kong.BindTo(appCtx, (*context.Context)(nil)),
 	)
 

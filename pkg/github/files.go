@@ -90,7 +90,7 @@ func SyncFiles(
 
 	// Process files
 	stats := &FileSyncStats{}
-	changes := []FileChange{}
+	var changes []FileChange
 
 	for _, mapping := range fileMappings {
 		fileChanges := processFileMapping(
@@ -211,7 +211,7 @@ func processFileMapping(
 		return nil
 	}
 
-	changes := []FileChange{}
+	var changes []FileChange
 
 	// Special case: renovate.json - check for non-standard locations to delete
 	if mapping.Dest == "renovate.json" {
@@ -422,7 +422,7 @@ func checkNonStandardRenovateConfigs(
 		".renovaterc.json5",
 	}
 
-	changes := []FileChange{}
+	var changes []FileChange
 
 	for _, path := range nonStandardPaths {
 		_, exists, err := fetchTargetFile(ctx, client, org, repo, path)
@@ -513,8 +513,7 @@ func closeExistingPR(
 		State: github.Ptr("closed"),
 	}
 
-	_, _, err = client.PullRequests.Edit(ctx, org, repo, prNumber, pr)
-	if err != nil {
+	if _, _, err := client.PullRequests.Edit(ctx, org, repo, prNumber, pr); err != nil {
 		return errors.Wrap(err, "closing PR")
 	}
 
