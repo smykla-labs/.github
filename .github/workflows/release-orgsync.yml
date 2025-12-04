@@ -1,0 +1,63 @@
+---
+name: Release orgsync
+
+on:
+  push:
+    tags:
+      - "orgsync/v*"
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v6.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b373c8fc6d7c8cc923a3e2b59c4c844e8aa9cc19 # v3.10.0
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@74b7057e56de0c61d23e8cacfdac07f0afe7f6f7 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@9c0c66a7a6c5bb5c1e23c39c1ec0562061b1c6e4 # v6.2.1
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Dispatch orgsync sync event
+        if: startsWith(github.ref, 'refs/tags/orgsync/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REF: ${{ github.ref }}
+        run: |
+          tag="${GITHUB_REF#refs/tags/orgsync/}"
+          version="${tag#v}"
+
+          gh api repos/smykla-labs/.github/dispatches \
+            --method POST \
+            --field event_type="orgsync-release" \
+            --field client_payload[version]="$version" \
+            --field client_payload[tag]="$tag"
+
+          echo "✓ Dispatched orgsync-release event (version=$version, tag=$tag)"
