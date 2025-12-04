@@ -27,6 +27,10 @@ inputs:
     description: Dry run (no changes)
     required: false
     default: "false"
+  source-repo:
+    description: Source repository name (where the workflow runs)
+    required: false
+    default: ".github"
 
 outputs:
   pr-url:
@@ -53,6 +57,7 @@ runs:
         TAG: ${{ inputs.tag }}
         SYNC_CONFIG: ${{ inputs.sync-config }}
         DRY_RUN: ${{ inputs.dry-run }}
+        SOURCE_REPO: ${{ inputs.source-repo }}
         GITHUB_RUN_ID: ${{ github.run_id }}
       run: |
         set -euo pipefail
@@ -76,8 +81,8 @@ runs:
             echo "   ⏭️  Skipping: sync.skip=true in repo config"
             skip_reason="smyklot version synchronization is disabled for this repository (sync.skip=true)"
           else
-            echo "   ⏭️  Skipping: smyklot.skip=true in repo config"
-            skip_reason="smyklot version synchronization is disabled for this repository (smyklot.skip=true)"
+            echo "   ⏭️  Skipping: sync.smyklot.skip=true in repo config"
+            skip_reason="smyklot version synchronization is disabled for this repository (sync.smyklot.skip=true)"
           fi
 
           # Check if there's an existing PR to close
@@ -323,7 +328,7 @@ runs:
         done
 
         # Build PR body
-        run_url="https://github.com/$ORG/.github/actions/runs/${GITHUB_RUN_ID}"
+        run_url="https://github.com/$ORG/$SOURCE_REPO/actions/runs/${GITHUB_RUN_ID}"
         pr_body="Updates [\`smykla-labs/smyklot\`](https://github.com/smykla-labs/smyklot) "
         pr_body="${pr_body}to version [\`$TAG\`](https://github.com/smykla-labs/smyklot/releases/tag/$TAG)."
         pr_body="${pr_body}"$'\n\n'"## Files Updated"$'\n\n'"${updated_list}"
