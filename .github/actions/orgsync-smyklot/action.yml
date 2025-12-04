@@ -27,48 +27,18 @@ inputs:
     description: Dry run (no changes)
     required: false
     default: "false"
-  orgsync-version:
-    description: orgsync container image version
-    required: false
-    default: latest
 
 runs:
-  using: composite
-  steps:
-    - name: Sync smyklot version with orgsync
-      shell: bash
-      env:
-        GITHUB_TOKEN: ${{ inputs.token }}
-        ORG: ${{ inputs.org }}
-        REPO: ${{ inputs.repo }}
-        VERSION: ${{ inputs.version }}
-        TAG: ${{ inputs.tag }}
-        SYNC_CONFIG: ${{ inputs.sync-config }}
-        DRY_RUN: ${{ inputs.dry-run }}
-        ORGSYNC_VERSION: ${{ inputs.orgsync-version }}
-      run: |
-        # Build dry-run flag
-        DRY_RUN_FLAG=""
-        if [ "$DRY_RUN" = "true" ]; then
-          DRY_RUN_FLAG="--dry-run"
-        fi
-
-        # Build config flag
-        CONFIG_FLAG=""
-        if [ -n "$SYNC_CONFIG" ] && [ "$SYNC_CONFIG" != "{}" ]; then
-          CONFIG_FLAG="--config $SYNC_CONFIG"
-        fi
-
-        # Run orgsync in container
-        docker run --rm \
-          -e GITHUB_TOKEN \
-          -v "$PWD:/workspace" \
-          -w /workspace \
-          "ghcr.io/smykla-labs/orgsync:${ORGSYNC_VERSION}" \
-          smyklot sync \
-            --org "$ORG" \
-            --repo "$REPO" \
-            --version "$VERSION" \
-            --tag "$TAG" \
-            $CONFIG_FLAG \
-            $DRY_RUN_FLAG
+  using: docker
+  image: docker://ghcr.io/smykla-labs/orgsync:latest
+  args:
+    - smyklot
+    - sync
+    - --org=${{ inputs.org }}
+    - --repo=${{ inputs.repo }}
+    - --version=${{ inputs.version }}
+    - --tag=${{ inputs.tag }}
+    - --config=${{ inputs.sync-config }}
+    - --dry-run=${{ inputs.dry-run }}
+  env:
+    GITHUB_TOKEN: ${{ inputs.token }}
