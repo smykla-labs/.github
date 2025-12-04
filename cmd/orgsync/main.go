@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/alecthomas/kong"
 	"github.com/smykla-labs/.github/pkg/config"
@@ -111,17 +112,75 @@ type FilesSyncCmd struct {
 }
 
 // Run executes the file sync command.
-//
-//nolint:unparam // placeholder implementation, will return errors in future
 func (c *FilesSyncCmd) Run(ctx context.Context, cli *CLI) error {
 	log := logger.FromContext(ctx)
-	log.Info("file sync not yet implemented",
+
+	log.Info("starting file sync",
+		"org", cli.Org,
 		"repo", c.Repo,
 		"branch_prefix", c.BranchPrefix,
 		"dry_run", cli.DryRun,
 	)
 
+	// Get GitHub token
+	token, err := github.GetToken(ctx, log, cli.UseGHAuth)
+	if err != nil {
+		return err
+	}
+
+	// Create GitHub client
+	client, err := github.NewClient(ctx, log, token)
+	if err != nil {
+		return err
+	}
+
+	// Parse sync config
+	syncConfig, err := config.ParseSyncConfigJSON(c.Config)
+	if err != nil {
+		return err
+	}
+
+	// Parse PR labels
+	var prLabels []string
+	if c.PRLabels != "" {
+		prLabels = splitLabels(c.PRLabels)
+	}
+
+	// Sync files
+	if err := github.SyncFiles(
+		ctx,
+		log,
+		client,
+		cli.Org,
+		c.Repo,
+		".github", // Source repo is always .github
+		c.FilesConfig,
+		syncConfig,
+		c.BranchPrefix,
+		prLabels,
+		cli.DryRun,
+	); err != nil {
+		return err
+	}
+
+	log.Info("file sync completed successfully")
+
 	return nil
+}
+
+// splitLabels splits comma-separated labels into a slice.
+func splitLabels(labels string) []string {
+	parts := strings.Split(labels, ",")
+	result := make([]string, 0, len(parts))
+
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+
+	return result
 }
 
 // SmyklotCmd contains smyklot sync subcommands.
