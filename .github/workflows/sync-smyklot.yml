@@ -1,0 +1,120 @@
+---
+name: Sync smyklot Version
+
+on:
+  repository_dispatch:
+    types: [smyklot-release]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "smyklot version (e.g., 1.9.2)"
+        required: true
+        type: string
+      tag:
+        description: "smyklot tag (e.g., v1.9.2)"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry run (no changes)"
+        required: false
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  get-repos:
+    runs-on: ubuntu-24.04
+    outputs:
+      repos: ${{ steps.repos.outputs.repos }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Generate App Token
+        id: token
+        uses: ./.github/actions/generate-token
+        with:
+          app-id: ${{ vars.SMYKLOT_APP_ID }}
+          private-key: ${{ secrets.SMYKLOT_APP_PRIVATE_KEY }}
+          owner: smykla-labs
+
+      - name: Get repositories
+        id: repos
+        uses: ./.github/actions/get-org-repos
+        with:
+          token: ${{ steps.token.outputs.token }}
+          org: smykla-labs
+
+  sync-smyklot:
+    needs: get-repos
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        repo: ${{ fromJson(needs.get-repos.outputs.repos) }}
+    concurrency:
+      group: sync-smyklot-${{ matrix.repo }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Generate App Token
+        id: token
+        uses: ./.github/actions/generate-token
+        with:
+          app-id: ${{ vars.SMYKLOT_APP_ID }}
+          private-key: ${{ secrets.SMYKLOT_APP_PRIVATE_KEY }}
+          owner: smykla-labs
+          repositories: ${{ matrix.repo }}
+
+      - name: Get sync config
+        id: config
+        uses: ./.github/actions/get-sync-config
+        with:
+          token: ${{ steps.token.outputs.token }}
+          org: smykla-labs
+          repo: ${{ matrix.repo }}
+
+      - name: Sync smyklot version
+        id: sync
+        uses: ./.github/actions/sync-smyklot-to-repo
+        with:
+          token: ${{ steps.token.outputs.token }}
+          org: smykla-labs
+          repo: ${{ matrix.repo }}
+          version: ${{ github.event.client_payload.version || inputs.version }}
+          tag: ${{ github.event.client_payload.tag || inputs.tag }}
+          sync-config: ${{ steps.config.outputs.config }}
+          dry-run: ${{ inputs.dry_run || 'false' }}
+
+      - name: Summary
+        env:
+          REPO: ${{ matrix.repo }}
+          UPDATED: ${{ steps.sync.outputs.updated }}
+          SKIPPED: ${{ steps.sync.outputs.skipped }}
+          PR_URL: ${{ steps.sync.outputs.pr-url }}
+          VERSION: ${{ github.event.client_payload.version || inputs.version }}
+          TAG: ${{ github.event.client_payload.tag || inputs.tag }}
+        run: |
+          {
+            echo "## smyklot Sync: $REPO"
+            echo ""
+            echo "**Version:** $TAG ($VERSION)"
+            echo ""
+            echo "| Metric | Value |"
+            echo "|:-------|------:|"
+            echo "| Files Updated | $UPDATED |"
+            echo "| Skipped | $SKIPPED |"
+            echo ""
+            if [ -n "$PR_URL" ]; then
+              echo "**PR:** $PR_URL"
+            else
+              if [ "$SKIPPED" = "true" ]; then
+                echo "_Sync disabled for this repository_"
+              else
+                echo "_No changes needed_"
+              fi
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
