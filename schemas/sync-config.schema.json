@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/smykla-labs/.github/main/schemas/sync-config.schema.json",
+  "title": "Sync Configuration",
+  "description": "Configuration for organization-wide label and file synchronization. Place at .github/sync-config.yml in your repository.",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "properties": {
+    "sync": {
+      "$ref": "#/$defs/syncConfig"
+    }
+  },
+  "$defs": {
+    "syncConfig": {
+      "type": "object",
+      "description": "Top-level sync configuration controlling label and file synchronization behavior.",
+      "unevaluatedProperties": false,
+      "properties": {
+        "skip": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip ALL syncs for this repository. Equivalent to setting both labels.skip and files.skip to true."
+        },
+        "labels": {
+          "$ref": "#/$defs/labelSyncConfig"
+        },
+        "files": {
+          "$ref": "#/$defs/fileSyncConfig"
+        }
+      }
+    },
+    "labelSyncConfig": {
+      "type": "object",
+      "description": "Label synchronization configuration.",
+      "unevaluatedProperties": false,
+      "properties": {
+        "skip": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip label synchronization only. File sync still runs unless sync.skip or sync.files.skip is true."
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "description": "Label names to exclude from synchronization. These labels will NOT be created/updated in this repository. Existing labels with these names are preserved but not managed.",
+          "examples": [
+            ["ci/skip-tests", "ci/force-full"],
+            ["release/major", "release/minor", "release/patch"]
+          ]
+        },
+        "allow_removal": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, labels in this repo that are NOT in the central config will be DELETED. Use with caution - this removes custom labels."
+        }
+      }
+    },
+    "fileSyncConfig": {
+      "type": "object",
+      "description": "File synchronization configuration.",
+      "unevaluatedProperties": false,
+      "properties": {
+        "skip": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip file synchronization only. Label sync still runs unless sync.skip or sync.labels.skip is true."
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[^/].*$"
+          },
+          "uniqueItems": true,
+          "description": "File paths (relative to repo root) to exclude from sync. These files will NOT be created/updated in this repository. Existing files at these paths are preserved but not managed.",
+          "examples": [
+            ["CONTRIBUTING.md", "CODE_OF_CONDUCT.md"],
+            [".github/PULL_REQUEST_TEMPLATE.md", "SECURITY.md"]
+          ]
+        },
+        "allow_removal": {
+          "type": "boolean",
+          "default": false,
+          "description": "DANGEROUS: When true, files in this repo that are NOT in the central sync config will be DELETED. This can cause data loss. Strongly recommend keeping this false."
+        }
+      }
+    }
+  }
+}
