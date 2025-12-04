@@ -109,4 +109,4 @@ jobs:
           org: smykla-labs
           repo: ${{ matrix.repo }}
           files-config: ${{ needs.prepare-files.outputs.files-config }}
-          dry-run: ${{ inputs.dry_run || false }}
+          dry-run: ${{ inputs.dry_run || 'false' }}

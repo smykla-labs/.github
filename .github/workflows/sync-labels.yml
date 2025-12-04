@@ -72,4 +72,4 @@ jobs:
           org: smykla-labs
           repo: ${{ matrix.repo }}
           labels-file: .github/labels.yml
-          dry-run: ${{ inputs.dry_run || false }}
+          dry-run: ${{ inputs.dry_run || 'false' }}

@@ -77,4 +77,4 @@ jobs:
           repo: ${{ matrix.repo }}
           version: ${{ github.event.client_payload.version || inputs.version }}
           tag: ${{ github.event.client_payload.tag || inputs.tag }}
-          dry-run: ${{ inputs.dry_run || false }}
+          dry-run: ${{ inputs.dry_run || 'false' }}

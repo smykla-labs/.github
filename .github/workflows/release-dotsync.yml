@@ -3,8 +3,7 @@ name: Release orgsync
 
 on:
   push:
-    tags:
-      - "orgsync/v*"
+    tags: ["orgsync/v*"]
 
 permissions:
   contents: write
