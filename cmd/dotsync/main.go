@@ -398,6 +398,7 @@ func (c *ReposListCmd) Run(ctx context.Context, cli *CLI) error {
 // ConfigCmd contains config schema subcommands.
 type ConfigCmd struct {
 	Schema ConfigSchemaCmd `cmd:"" help:"Generate JSON Schema for sync configuration"`
+	Verify ConfigVerifyCmd `cmd:"" help:"Verify schema is in sync and commit if needed"`
 }
 
 // ConfigSchemaCmd generates JSON Schema for sync configuration.
@@ -478,6 +479,59 @@ func addExcludeExamples(defs map[string]any, configName string, examples []any) 
 	}
 
 	exclude["examples"] = examples
+}
+
+// ConfigVerifyCmd verifies schema is in sync and commits if needed.
+type ConfigVerifyCmd struct {
+	Repo       string `help:"Repository (owner/name)" required:""`
+	Branch     string `help:"Branch name" required:""`
+	SchemaFile string `help:"Path to schema file" default:"schemas/sync-config.schema.json"`
+}
+
+// Run executes the config verify command.
+func (c *ConfigVerifyCmd) Run(ctx context.Context, cli *CLI) error {
+	log := logger.FromContext(ctx)
+
+	log.Info("verifying schema sync status",
+		"repo", c.Repo,
+		"branch", c.Branch,
+		"schema_file", c.SchemaFile,
+	)
+
+	// Get GitHub token
+	token, err := github.GetToken(ctx, log, cli.UseGHAuth)
+	if err != nil {
+		return err
+	}
+
+	// Create GitHub client
+	client, err := github.NewClient(ctx, log, token)
+	if err != nil {
+		return err
+	}
+
+	// Verify and commit schema if needed
+	changed, err := github.VerifyAndCommitSchema(
+		ctx,
+		log,
+		client,
+		c.Repo,
+		c.Branch,
+		c.SchemaFile,
+		cli.DryRun,
+	)
+	if err != nil {
+		return err
+	}
+
+	if changed {
+		log.Info("schema was out of sync and has been committed")
+		return errors.New("schema was regenerated - check will pass on re-run")
+	}
+
+	log.Info("schema is up to date")
+
+	return nil
 }
 
 func main() {
