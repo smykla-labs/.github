@@ -23,7 +23,7 @@ inputs:
   dry-run:
     description: Dry run (no changes)
     required: false
-    default: "false"
+    default: false
   branch-prefix:
     description: Prefix for sync branches
     required: false
@@ -39,12 +39,12 @@ runs:
   args:
     - files
     - sync
-    - --org=${{ inputs.org }}
-    - --repo=${{ inputs.repo }}
-    - --files-config=${{ inputs.files-config }}
-    - --config=${{ inputs.sync-config }}
-    - --branch-prefix=${{ inputs.branch-prefix }}
-    - --pr-labels=${{ inputs.pr-labels }}
-    - --dry-run=${{ inputs.dry-run }}
+    - --org="${{ inputs.org }}"
+    - --repo="${{ inputs.repo }}"
+    - --files-config="${{ inputs.files-config }}"
+    - --config="${{ inputs.sync-config }}"
+    - --branch-prefix="${{ inputs.branch-prefix }}"
+    - --pr-labels="${{ inputs.pr-labels }}"
+    - --dry-run="${{ inputs.dry-run }}"
   env:
     GITHUB_TOKEN: ${{ inputs.token }}

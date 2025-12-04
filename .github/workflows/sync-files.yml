@@ -86,7 +86,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        repo: ${{ fromJson(needs.get-repos.outputs.repos) }}
+        repo: ${{ fromJSON(needs.get-repos.outputs.repos) }}
     concurrency:
       group: sync-files-${{ matrix.repo }}
       cancel-in-progress: false
@@ -103,51 +103,11 @@ jobs:
           owner: smykla-labs
           repositories: ${{ matrix.repo }}
 
-      - name: Get sync config
-        id: config
-        uses: ./.github/actions/get-sync-config
-        with:
-          token: ${{ steps.token.outputs.token }}
-          org: smykla-labs
-          repo: ${{ matrix.repo }}
-
       - name: Sync files
-        id: sync
-        uses: ./.github/actions/sync-files-to-repo
+        uses: ./.github/actions/orgsync-files
         with:
           token: ${{ steps.token.outputs.token }}
           org: smykla-labs
           repo: ${{ matrix.repo }}
           files-config: ${{ needs.prepare-files.outputs.files-config }}
-          sync-config: ${{ steps.config.outputs.config }}
-          dry-run: ${{ inputs.dry_run || 'false' }}
-
-      - name: Summary
-        env:
-          REPO: ${{ matrix.repo }}
-          CREATED: ${{ steps.sync.outputs.created }}
-          UPDATED: ${{ steps.sync.outputs.updated }}
-          DELETED: ${{ steps.sync.outputs.deleted }}
-          SKIPPED: ${{ steps.sync.outputs.skipped }}
-          EXCLUDED: ${{ steps.sync.outputs.excluded }}
-          MODIFIED_EXCLUDED: ${{ steps.sync.outputs.modified-excluded }}
-          PR_URL: ${{ steps.sync.outputs.pr-url }}
-        run: |
-          {
-            echo "## File Sync: $REPO"
-            echo ""
-            echo "| Metric | Count |"
-            echo "|:-------|------:|"
-            echo "| Created | $CREATED |"
-            echo "| Updated | $UPDATED |"
-            echo "| Deleted | $DELETED |"
-            echo "| Skipped | $SKIPPED |"
-            echo "| Excluded | $EXCLUDED |"
-            echo "| Modified & Excluded | $MODIFIED_EXCLUDED |"
-            echo ""
-            if [ -n "$PR_URL" ]; then
-              echo "**PR:** $PR_URL"
-            else
-              echo "_No changes needed_"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          dry-run: ${{ inputs.dry_run || false }}

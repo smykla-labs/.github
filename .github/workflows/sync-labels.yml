@@ -66,20 +66,11 @@ jobs:
           owner: smykla-labs
           repositories: ${{ matrix.repo }}
 
-      - name: Get sync config
-        id: config
-        uses: ./.github/actions/get-sync-config
-        with:
-          token: ${{ steps.token.outputs.token }}
-          org: smykla-labs
-          repo: ${{ matrix.repo }}
-
       - name: Sync labels to repository
-        uses: ./.github/actions/sync-labels-to-repo
+        uses: ./.github/actions/orgsync-labels
         with:
           token: ${{ steps.token.outputs.token }}
           org: smykla-labs
           repo: ${{ matrix.repo }}
           labels-file: .github/labels.yml
-          sync-config: ${{ steps.config.outputs.config }}
           dry-run: ${{ inputs.dry_run || false }}
