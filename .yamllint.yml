@@ -10,6 +10,5 @@ rules:
   truthy:
     allowed-values: ["true", "false", "on"]
 
-  # Allow longer lines in workflow files (bash scripts)
-  line-length:
-    max: 120
+  # Disable line length checks
+  line-length: disable

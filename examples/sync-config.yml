@@ -27,6 +27,9 @@
 #     exclude: [string]          # File paths to exclude from sync
 #     allow_removal: bool        # Delete non-central files (default: false)
 #
+#   smyklot:                     # Smyklot version sync configuration
+#     skip: bool                 # Skip smyklot version sync (default: false)
+#
 # ---------------------------------------------------------------------------
 # FIELD DETAILS
 # ---------------------------------------------------------------------------
@@ -66,6 +69,11 @@
 #   sync config will be DELETED. This can cause data loss.
 #   Strongly recommend keeping this false (default).
 #
+# sync.smyklot.skip (boolean, default: false)
+#   When true, skips smyklot version synchronization only.
+#   Label and file sync still run unless their respective skip flags are set.
+#   Use this for repos that don't use smyklot or manage their own versions.
+#
 # ---------------------------------------------------------------------------
 # EXAMPLES
 # ---------------------------------------------------------------------------
@@ -104,7 +112,12 @@ sync: {}
 #   files:
 #     skip: true
 
-# Example 6: Full customization
+# Example 6: Skip smyklot sync only (for repos that don't use smyklot)
+# sync:
+#   smyklot:
+#     skip: true
+
+# Example 7: Full customization
 # sync:
 #   skip: false
 #   labels:
@@ -120,3 +133,5 @@ sync: {}
 #       - "SECURITY.md"
 #       - ".github/PULL_REQUEST_TEMPLATE.md"
 #     allow_removal: false
+#   smyklot:
+#     skip: false
