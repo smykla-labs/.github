@@ -620,19 +620,13 @@ runs:
 
           echo "   Updated existing PR: $pr_url"
         else
-          # Build label args for create (uses pre-built label_array)
-          label_args=()
-          for label in "${label_array[@]}"; do
-            label_args+=(--label "$label")
-          done
-
+          # Create PR without labels first (to avoid label not found errors)
           pr_result=$(gh pr create \
             --repo "$ORG/$REPO" \
             --head "$branch_name" \
             --base "$default_branch" \
             --title "$pr_title" \
             --body "$pr_body" \
-            "${label_args[@]}" \
             2>&1) || true
 
           if echo "$pr_result" | grep -q "^https://"; then
@@ -640,6 +634,18 @@ runs:
             echo "   Created PR: $pr_url"
             # Extract PR number from URL
             pr_number=$(echo "$pr_url" | grep -oE '[0-9]+$')
+
+            # Add labels if they exist (ignore errors for missing labels)
+            if [ ${#label_array[@]} -gt 0 ]; then
+              label_args=()
+              for label in "${label_array[@]}"; do
+                label_args+=(--add-label "$label")
+              done
+              gh pr edit "$pr_number" \
+                --repo "$ORG/$REPO" \
+                "${label_args[@]}" \
+                2>&1 || echo "   ⚠️  Some labels may not exist in target repo"
+            fi
           else
             pr_url=""
             echo "   ❌ Failed to create PR"
