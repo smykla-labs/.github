@@ -27,4 +27,4 @@ runs:
     - --repo=${{ inputs.repo }}
     - --branch=${{ inputs.branch }}
     - --schema-file=${{ inputs.schema-file }}
-    - ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
+    - --dry-run=${{ inputs.dry-run }}
