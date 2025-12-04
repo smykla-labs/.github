@@ -33,14 +33,14 @@ jobs:
         with:
           app-id: ${{ vars.SMYKLOT_APP_ID }}
           private-key: ${{ secrets.SMYKLOT_APP_PRIVATE_KEY }}
-          owner: smykla-labs
+          owner: ${{ github.repository_owner }}
 
       - name: Get repositories
         id: repos
-        uses: ./.github/actions/get-org-repos
+        uses: ./.github/actions/dotsync-repos-list
         with:
           token: ${{ steps.token.outputs.token }}
-          org: smykla-labs
+          org: ${{ github.repository_owner }}
 
   sync-labels:
     needs: get-repos
@@ -62,14 +62,14 @@ jobs:
         with:
           app-id: ${{ vars.SMYKLOT_APP_ID }}
           private-key: ${{ secrets.SMYKLOT_APP_PRIVATE_KEY }}
-          owner: smykla-labs
+          owner: ${{ github.repository_owner }}
           repositories: ${{ matrix.repo }}
 
       - name: Sync labels to repository
         uses: ./.github/actions/dotsync-labels
         with:
           token: ${{ steps.token.outputs.token }}
-          org: smykla-labs
+          org: ${{ github.repository_owner }}
           repo: ${{ matrix.repo }}
           labels-file: .github/labels.yml
           dry-run: ${{ inputs.dry_run || 'false' }}

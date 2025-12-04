@@ -1,0 +1,18 @@
+---
+name: Discover Files (dotsync)
+description: >-
+  Discover files from templates directory using dotsync container
+
+inputs:
+  templates-dir:
+    description: Path to templates directory
+    required: false
+    default: templates
+
+runs:
+  using: docker
+  image: docker://ghcr.io/smykla-labs/dotsync:latest
+  args:
+    - files
+    - discover
+    - --templates-dir=${{ inputs.templates-dir }}

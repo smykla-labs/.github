@@ -37,14 +37,14 @@ jobs:
         with:
           app-id: ${{ vars.SMYKLOT_APP_ID }}
           private-key: ${{ secrets.SMYKLOT_APP_PRIVATE_KEY }}
-          owner: smykla-labs
+          owner: ${{ github.repository_owner }}
 
       - name: Get repositories
         id: repos
-        uses: ./.github/actions/get-org-repos
+        uses: ./.github/actions/dotsync-repos-list
         with:
           token: ${{ steps.token.outputs.token }}
-          org: smykla-labs
+          org: ${{ github.repository_owner }}
 
   sync-smyklot:
     needs: get-repos
@@ -66,14 +66,14 @@ jobs:
         with:
           app-id: ${{ vars.SMYKLOT_APP_ID }}
           private-key: ${{ secrets.SMYKLOT_APP_PRIVATE_KEY }}
-          owner: smykla-labs
+          owner: ${{ github.repository_owner }}
           repositories: ${{ matrix.repo }}
 
       - name: Sync smyklot version
         uses: ./.github/actions/dotsync-smyklot
         with:
           token: ${{ steps.token.outputs.token }}
-          org: smykla-labs
+          org: ${{ github.repository_owner }}
           repo: ${{ matrix.repo }}
           version: ${{ github.event.client_payload.version || inputs.version }}
           tag: ${{ github.event.client_payload.tag || inputs.tag }}
