@@ -9,7 +9,8 @@ Organization-wide defaults and synchronization for smykla-labs repositories. Thi
 1. **Community Health Files** - Provides default templates for all smykla-labs repos (CODE_OF_CONDUCT, CONTRIBUTING, SECURITY, issue/PR templates)
 2. **Label Sync** - Automated synchronization of GitHub labels across all repositories using custom composite action
 3. **File Sync** - Automated synchronization of specified files across repositories using custom composite action
-4. **Reusable Workflows** - Shared CI/CD workflows for Go projects (lint, test, build, release)
+4. **Smyklot Sync** - Automated synchronization of smyklot version references in workflow files
+5. **Reusable Workflows** - Shared CI/CD workflows for Go projects (lint, test, build, release)
 
 ## Repository Structure
 
@@ -20,6 +21,7 @@ Organization-wide defaults and synchronization for smykla-labs repositories. Thi
 │   ├── workflows/
 │   │   ├── sync-labels.yml     # Label sync workflow
 │   │   ├── sync-files.yml      # File sync workflow
+│   │   ├── sync-smyklot.yml    # Smyklot version sync workflow
 │   │   ├── lib-lint.yml        # Reusable lint workflow
 │   │   ├── lib-test.yml        # Reusable test workflow
 │   │   ├── lib-build.yml       # Reusable build workflow
@@ -29,7 +31,8 @@ Organization-wide defaults and synchronization for smykla-labs repositories. Thi
 │   │   ├── get-org-repos/      # Fetch org repositories
 │   │   ├── get-sync-config/    # Fetch per-repo sync configuration
 │   │   ├── sync-labels-to-repo/ # Label sync with config support
-│   │   └── sync-files-to-repo/ # File sync with config support
+│   │   ├── sync-files-to-repo/ # File sync with config support
+│   │   └── sync-smyklot-to-repo/ # Smyklot version sync with config support
 │   ├── ISSUE_TEMPLATE/         # Default issue templates
 │   └── PULL_REQUEST_TEMPLATE.md
 ├── examples/
@@ -77,19 +80,28 @@ The synchronization system uses custom composite actions with unified per-repo c
 - **Method**: Creates PRs with file changes via GitHub API
 - **Features**: File exclusions, skip flags, PR management, smart renovate.json handling
 
+**Smyklot Sync:**
+
+- **Action**: Custom composite action (`.github/actions/sync-smyklot-to-repo`)
+- **Workflow**: `.github/workflows/sync-smyklot.yml`
+- **Trigger**: Repository dispatch from smyklot releases or manual dispatch
+- **Config**: Per-repo `.github/sync-config.yml` (optional)
+- **Method**: Creates PRs with version updates via GitHub API
+- **Features**: Auto-merge, skip flags, updates `uses:` and `ghcr.io/` references
+
 **Unified Config:**
 
 - Repos can create `.github/sync-config.yml` to customize behavior
-- Control both label and file sync from single config file
+- Control label, file, and smyklot sync from single config file
 - Supports skip flags, exclusions, and removal options
 - See `examples/sync-config.yml` for full schema
 
 **Flow:**
 
-- Each workflow triggers independently on relevant file changes
-- Both workflows run for all repos in parallel
-- Label sync updates directly; file sync creates PRs with `org-sync` label
-- File sync uses `chore/org-sync` branch for changes
+- Each workflow triggers independently on relevant events
+- All workflows run for all repos in parallel
+- Label sync updates directly; file and smyklot sync create PRs
+- File sync uses `chore/org-sync` branch; smyklot sync uses `chore/sync-smyklot` branch
 
 ### Label Synchronization
 
@@ -112,6 +124,49 @@ The synchronization system uses custom composite actions with unified per-repo c
 - If manual commits found (not from sync workflow), excludes file from sync
 - Shows alert in PR with instructions to add to `.github/sync-config.yml`
 - This is the ONLY file with this special behavior
+
+### Smyklot Synchronization
+
+- **Trigger**: Automatically triggered by smyklot releases via `repository_dispatch`
+- **Purpose**: Updates smyklot version references in workflow files across all repos
+- **Target**: All repositories in smykla-labs organization (except `.github` and `smyklot` itself)
+- **Method**: Custom composite action using GitHub API
+- **Features**: PR creation with auto-merge, skip flags, intelligent change detection
+
+**Version References Updated:**
+
+1. GitHub Action references: `uses: smykla-labs/smyklot@v1.2.3`
+2. Docker image references: `ghcr.io/smykla-labs/smyklot:1.2.3`
+
+**Workflow Triggers:**
+
+- **Primary**: `repository_dispatch` event from smyklot release workflow
+  - Event type: `smyklot-release`
+  - Payload: `{ "version": "X.Y.Z", "tag": "vX.Y.Z" }`
+- **Secondary**: Manual `workflow_dispatch` with version inputs
+
+**Branch & PR Management:**
+
+- Branch: `chore/sync-smyklot` (distinct from file sync)
+- Commit: Single commit per repo with all workflow file updates
+- PR title: `chore(deps): update smyklot to vX.Y.Z`
+- Label: `ci/skip-all` to avoid triggering CI
+- Auto-merge: Enabled with squash strategy after PR creation
+
+**Skip Configuration:**
+
+Repos can opt out via `.github/sync-config.yml`:
+```yaml
+sync:
+  smyklot:
+    skip: true  # Skip smyklot version sync for this repo
+```
+
+**Smart PR Management:**
+
+- Closes existing PR if smyklot is already up to date
+- Updates existing PR if new version released before merge
+- Closes existing PR if sync is disabled via config
 
 ### Reusable Workflows
 
@@ -173,9 +228,10 @@ All workflows use the **smyklot** GitHub App for authentication:
 
 Trigger workflows manually via GitHub Actions:
 1. Go to Actions tab in this repository
-2. Select "Sync Labels" or "Sync Files"
+2. Select "Sync Labels", "Sync Files", or "Sync smyklot Version"
 3. Click "Run workflow"
-4. Optionally enable "Dry run" to preview changes
+4. For Labels/Files: Optionally enable "Dry run" to preview changes
+5. For smyklot: Provide version (e.g., `1.9.2`) and tag (e.g., `v1.9.2`)
 
 ### Workflow Behavior
 
@@ -204,6 +260,22 @@ Trigger workflows manually via GitHub Actions:
 - **Dry run**: Available via workflow dispatch
 - **Special**: Detects manual `renovate.json` modifications and excludes from sync
 
+#### Smyklot Sync Workflow
+
+- **Trigger**: Repository dispatch from smyklot releases, or manual dispatch
+- **Flow**:
+  1. Get list of all org repositories
+  2. For each repo: Fetch sync config, generate token, scan workflow files
+  3. Update smyklot version references (both `uses:` and `ghcr.io/`)
+  4. Create PR if changes detected
+- **Matrix**: Processes all repos in parallel (fail-fast: false)
+- **Action**: Custom composite action handles version replacement and PR creation
+- **Branch**: Uses `chore/sync-smyklot` prefix
+- **Commits**: Single commit with all workflow file updates
+- **PR**: Labeled with `ci/skip-all`, title: "chore(deps): update smyklot to vX.Y.Z"
+- **Auto-merge**: Enabled with squash strategy
+- **Dry run**: Available via workflow dispatch
+
 ## Files to Edit
 
 ### Labels
@@ -215,6 +287,12 @@ Trigger workflows manually via GitHub Actions:
 
 - **Source**: `templates/` directory (auto-discovered)
 - **Workflow**: `.github/workflows/sync-files.yml`
+
+### Smyklot Versions
+
+- **Trigger**: Automatic via smyklot release workflow
+- **Workflow**: `.github/workflows/sync-smyklot.yml`
+- **Manual**: Run workflow dispatch with version/tag inputs
 
 ### Community Health Files
 
@@ -254,12 +332,20 @@ Both label and file sync use custom composite actions instead of third-party act
 - **Implementation**: Bash script using GitHub API for PR creation and file management
 - **Benefits**: Full control, per-file exclusions, unified config, no external dependencies
 
+**Smyklot Sync:**
+
+- **Location**: `.github/actions/sync-smyklot-to-repo`
+- **Why**: Need automated version updates triggered by releases with per-repo config
+- **Implementation**: Bash script using GitHub API and sed for version replacement in workflow files
+- **Benefits**: Zero-touch updates on release, auto-merge, unified config, smart PR management
+
 ### Unified Config Design
 
-- Single `.github/sync-config.yml` controls both label and file sync
+- Single `.github/sync-config.yml` controls label, file, and smyklot sync
 - Repos opt-in to features (skip flags, exclusions, removal)
 - Label/file removal defaults to false (safer)
 - Config fetched per-repo at sync time
+- Smyklot sync respects both `sync.skip` and `sync.smyklot.skip` flags
 
 ### Reusable Workflows Over File Sync
 
@@ -274,12 +360,13 @@ For CI/CD workflows, use reusable workflows instead of file sync:
 - This repository does NOT use standard `make` targets or testing frameworks
 - All automation is via GitHub Actions workflows
 - Changes to `labels.yml` or `templates/**` trigger automatic syncs
-- Workflows exclude `.github` repository from sync targets
+- Smyklot releases trigger automatic version sync across all repos
+- Workflows exclude `.github` and `smyklot` repositories from their respective sync targets
 - Label sync happens directly via API (no PRs)
-- File sync creates PRs for review
+- File and smyklot sync create PRs for review (smyklot with auto-merge)
 - Dry run mode available to preview changes without making them
 - Community actions pinned to commit SHAs for security
-- Both sync actions are custom, simple, and maintainable (~100-200 lines each)
+- All sync actions are custom, simple, and maintainable (~100-500 lines each)
 - Unified config system supports per-repo customization
 - Reusable workflows provide instant updates without PRs
 - See `examples/sync-config.yml` for complete configuration schema
