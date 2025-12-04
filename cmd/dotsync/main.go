@@ -252,10 +252,22 @@ type ReposCmd struct {
 }
 
 // ReposListCmd lists organization repositories.
-type ReposListCmd struct{}
+type ReposListCmd struct {
+	Format string `help:"Output format (json|names)" default:"json" enum:"json,names"`
+}
+
+// RepoInfo represents repository information for JSON output.
+type RepoInfo struct {
+	Name          string `json:"name"`
+	FullName      string `json:"full_name"`
+	Private       bool   `json:"private"`
+	Archived      bool   `json:"archived"`
+	Disabled      bool   `json:"disabled"`
+	DefaultBranch string `json:"default_branch"`
+}
 
 // Run executes the repos list command.
-func (*ReposListCmd) Run(ctx context.Context, cli *CLI) error {
+func (c *ReposListCmd) Run(ctx context.Context, cli *CLI) error {
 	log := logger.FromContext(ctx)
 
 	token, err := github.GetToken(ctx, log, cli.UseGHAuth)
@@ -268,37 +280,52 @@ func (*ReposListCmd) Run(ctx context.Context, cli *CLI) error {
 		return err
 	}
 
-	log.Debug("listing repositories", "org", cli.Org)
+	log.Debug("listing repositories", "org", cli.Org, "format", c.Format)
 
 	repos, _, err := client.Repositories.ListByOrg(ctx, cli.Org, nil)
 	if err != nil {
 		return err
 	}
 
-	type repoInfo struct {
-		Name          string `json:"name"`
-		FullName      string `json:"full_name"`
-		Private       bool   `json:"private"`
-		Archived      bool   `json:"archived"`
-		Disabled      bool   `json:"disabled"`
-		DefaultBranch string `json:"default_branch"`
-	}
+	var output []byte
 
-	repoList := make([]repoInfo, 0, len(repos))
-	for _, repo := range repos {
-		repoList = append(repoList, repoInfo{
-			Name:          repo.GetName(),
-			FullName:      repo.GetFullName(),
-			Private:       repo.GetPrivate(),
-			Archived:      repo.GetArchived(),
-			Disabled:      repo.GetDisabled(),
-			DefaultBranch: repo.GetDefaultBranch(),
-		})
-	}
+	switch c.Format {
+	case "names":
+		// Build list of repository names, excluding .github
+		repoNames := make([]string, 0, len(repos))
+		for _, repo := range repos {
+			name := repo.GetName()
+			if name == ".github" {
+				log.Debug("excluding .github repository from list")
+				continue
+			}
 
-	output, err := json.MarshalIndent(repoList, "", "  ")
-	if err != nil {
-		return err
+			repoNames = append(repoNames, name)
+		}
+
+		// Output as compact JSON array
+		output, err = json.Marshal(repoNames)
+		if err != nil {
+			return err
+		}
+
+	default: // "json"
+		repoList := make([]RepoInfo, 0, len(repos))
+		for _, repo := range repos {
+			repoList = append(repoList, RepoInfo{
+				Name:          repo.GetName(),
+				FullName:      repo.GetFullName(),
+				Private:       repo.GetPrivate(),
+				Archived:      repo.GetArchived(),
+				Disabled:      repo.GetDisabled(),
+				DefaultBranch: repo.GetDefaultBranch(),
+			})
+		}
+
+		output, err = json.MarshalIndent(repoList, "", "  ")
+		if err != nil {
+			return err
+		}
 	}
 
 	fmt.Println(string(output))
