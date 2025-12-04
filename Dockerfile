@@ -14,7 +14,8 @@ LABEL org.opencontainers.image.licenses="MIT"
 COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Copy pre-built binary from GoReleaser to /usr/local/bin for PATH access
-COPY dotsync /usr/local/bin/dotsync
+# TARGETPLATFORM is set by docker buildx (e.g., linux/amd64, linux/arm64)
+COPY ${TARGETPLATFORM}/dotsync /usr/local/bin/dotsync
 
 # Set PATH to include /usr/local/bin (scratch image has no PATH by default)
 ENV PATH="/usr/local/bin:${PATH}"
