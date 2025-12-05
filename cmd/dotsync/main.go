@@ -58,6 +58,8 @@ type LabelsSyncCmd struct {
 }
 
 // Run executes the label sync command.
+//
+//nolint:dupl // Similar structure to other sync commands but with different operations
 func (c *LabelsSyncCmd) Run(ctx context.Context, cli *CLI) error {
 	log := logger.FromContext(ctx)
 
@@ -329,6 +331,8 @@ type SettingsSyncCmd struct {
 }
 
 // Run executes the settings sync command.
+//
+//nolint:dupl // Similar structure to other sync commands but with different operations
 func (c *SettingsSyncCmd) Run(ctx context.Context, cli *CLI) error {
 	log := logger.FromContext(ctx)
 

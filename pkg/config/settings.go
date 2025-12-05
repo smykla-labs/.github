@@ -1,14 +1,20 @@
 //nolint:golines // Config structs have jsonschema tags that exceed line length limits
 package config
 
-// SyncConfig is the root configuration structure
+// Configuration for controlling organization-wide synchronization of labels, files, smyklot
+// versions, and repository settings across all repositories
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type SyncConfig struct {
 	// Top-level sync configuration controlling label, file, and smyklot version synchronization
 	// behavior
 	Sync SyncSettings `json:"sync" yaml:"sync"`
 }
 
-// SyncSettings contains all sync-related settings
+// Centralized control for all synchronization operations including labels, files, smyklot
+// versions, and repository settings
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type SyncSettings struct {
 	// Skip ALL syncs for this repository. Equivalent to setting labels.skip, files.skip,
 	// smyklot.skip, and settings.skip to true
@@ -23,7 +29,10 @@ type SyncSettings struct {
 	Settings SettingsConfig `json:"settings" yaml:"settings"`
 }
 
-// LabelsConfig controls label synchronization behavior
+// Manages which GitHub labels are synced from central configuration, with options to exclude
+// specific labels or remove labels not in the central config
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type LabelsConfig struct {
 	// Skip label synchronization only. File sync still runs unless sync.skip or sync.files.skip
 	// is true
@@ -36,7 +45,10 @@ type LabelsConfig struct {
 	AllowRemoval bool `json:"allow_removal" jsonschema:"default=false" yaml:"allow_removal"`
 }
 
-// FilesConfig controls file synchronization behavior.
+// Controls which organization template files (CODE_OF_CONDUCT.md, CONTRIBUTING.md, etc.) are
+// synced to this repository, with options to exclude specific files or remove unmanaged files
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type FilesConfig struct {
 	// Skip file synchronization only. Label sync still runs unless sync.skip or
 	// sync.labels.skip is true
@@ -50,7 +62,10 @@ type FilesConfig struct {
 	AllowRemoval bool `json:"allow_removal" jsonschema:"default=false" yaml:"allow_removal"`
 }
 
-// SmyklotConfig controls smyklot version synchronization behavior
+// Controls automatic updates of smyklot version references in workflow files when new versions
+// are released
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type SmyklotConfig struct {
 	// Skip smyklot version synchronization only. Label and file sync still run unless their
 	// respective skip flags are set. Use this for repos that don't use smyklot or manage their
@@ -58,7 +73,10 @@ type SmyklotConfig struct {
 	Skip bool `json:"skip" jsonschema:"default=false" yaml:"skip"`
 }
 
-// SettingsConfig controls repository settings synchronization behavior
+// Controls synchronization of GitHub repository settings like merge strategies, branch
+// protection, security features, and access controls
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type SettingsConfig struct {
 	// Skip repository settings synchronization. Other sync operations still run unless their
 	// respective skip flags are set
@@ -67,7 +85,9 @@ type SettingsConfig struct {
 	Exclude []string `json:"exclude" jsonschema:"examples=branch_protection,examples=security.secret_scanning,minLength=1,uniqueItems=true" yaml:"exclude"`
 }
 
-// RepositorySettingsConfig defines repository-level settings
+// Configures merge strategies and branch cleanup behavior for pull requests
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type RepositorySettingsConfig struct {
 	// Allow squash merge for pull requests
 	AllowSquashMerge *bool `json:"allow_squash_merge" yaml:"allow_squash_merge"`
@@ -81,7 +101,10 @@ type RepositorySettingsConfig struct {
 	DeleteBranchOnMerge *bool `json:"delete_branch_on_merge" yaml:"delete_branch_on_merge"`
 }
 
-// FeaturesConfig defines repository feature settings
+// Controls which GitHub features are enabled for the repository (Issues, Wiki, Projects,
+// Discussions)
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type FeaturesConfig struct {
 	// Enable GitHub Issues
 	HasIssues *bool `json:"has_issues" yaml:"has_issues"`
@@ -93,7 +116,10 @@ type FeaturesConfig struct {
 	HasDiscussions *bool `json:"has_discussions" yaml:"has_discussions"`
 }
 
-// SecurityConfig defines security and analysis settings
+// Configures GitHub Advanced Security features including secret scanning and Dependabot
+// security updates
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type SecurityConfig struct {
 	// Enable secret scanning (requires GitHub Advanced Security)
 	SecretScanning *string `json:"secret_scanning" jsonschema:"enum=enabled,enum=disabled" yaml:"secret_scanning"`
@@ -104,7 +130,10 @@ type SecurityConfig struct {
 	DependabotSecurityUpdates *string `json:"dependabot_security_updates" jsonschema:"enum=enabled,enum=disabled" yaml:"dependabot_security_updates"`
 }
 
-// BranchProtectionRuleConfig defines branch protection rules
+// Configures protection rules for branches including required status checks, required reviews,
+// and restrictions on who can push
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type BranchProtectionRuleConfig struct {
 	// Branch name pattern
 	Pattern string `json:"pattern" jsonschema:"examples=main,examples=release/*,minLength=1,required" yaml:"pattern"`
@@ -126,7 +155,10 @@ type BranchProtectionRuleConfig struct {
 	Restrictions *BranchRestrictionsConfig `json:"restrictions" yaml:"restrictions"`
 }
 
-// RequiredStatusChecks defines required status check settings
+// Specifies CI/CD checks that must pass before merging, with option to require branches be
+// up-to-date
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type RequiredStatusChecks struct {
 	// Require branches to be up to date before merging
 	Strict *bool `json:"strict" yaml:"strict"`
@@ -135,7 +167,10 @@ type RequiredStatusChecks struct {
 	Contexts []string `json:"contexts" yaml:"contexts"`
 }
 
-// RequiredReviews defines required pull request review settings
+// Configures pull request review requirements including approval count, code owner reviews,
+// and who can bypass requirements
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type RequiredReviews struct {
 	// Number of required approving reviews
 	RequiredApprovingReviewCount *int `json:"count" jsonschema:"maximum=6,minimum=0" yaml:"count"`

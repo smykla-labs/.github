@@ -2,7 +2,7 @@
   "$defs": {
     "FilesConfig": {
       "additionalProperties": false,
-      "description": "FilesConfig controls file synchronization behavior.",
+      "description": "Controls which organization template files (CODE_OF_CONDUCT.md, CONTRIBUTING.md, etc.) are synced to this repository, with options to exclude specific files or remove unmanaged files",
       "properties": {
         "allow_removal": {
           "default": false,
@@ -39,7 +39,7 @@
     },
     "LabelsConfig": {
       "additionalProperties": false,
-      "description": "LabelsConfig controls label synchronization behavior",
+      "description": "Manages which GitHub labels are synced from central configuration, with options to exclude specific labels or remove labels not in the central config",
       "properties": {
         "allow_removal": {
           "default": false,
@@ -76,7 +76,7 @@
     },
     "SettingsConfig": {
       "additionalProperties": false,
-      "description": "SettingsConfig controls repository settings synchronization behavior",
+      "description": "Controls synchronization of GitHub repository settings like merge strategies, branch protection, security features, and access controls",
       "properties": {
         "exclude": {
           "description": "Specific settings sections or fields to exclude from sync",
@@ -97,7 +97,7 @@
     },
     "SmyklotConfig": {
       "additionalProperties": false,
-      "description": "SmyklotConfig controls smyklot version synchronization behavior",
+      "description": "Controls automatic updates of smyklot version references in workflow files when new versions are released",
       "properties": {
         "skip": {
           "default": false,
@@ -109,7 +109,7 @@
     },
     "SyncConfig": {
       "additionalProperties": false,
-      "description": "SyncConfig is the root configuration structure",
+      "description": "Configuration for controlling organization-wide synchronization of labels, files, smyklot versions, and repository settings across all repositories",
       "properties": {
         "sync": {
           "$ref": "#/$defs/SyncSettings",
@@ -120,7 +120,7 @@
     },
     "SyncSettings": {
       "additionalProperties": false,
-      "description": "SyncSettings contains all sync-related settings",
+      "description": "Centralized control for all synchronization operations including labels, files, smyklot versions, and repository settings",
       "properties": {
         "files": {
           "$ref": "#/$defs/FilesConfig",
