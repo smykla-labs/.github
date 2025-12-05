@@ -26,13 +26,13 @@ builds:
     ldflags:
       - -s
       - -w
-      - -X main.version={{ trimPrefix .Tag "dotsync/" }}
+      - -X main.version={{ trimprefix .Tag "dotsync/" }}
 
 archives:
   - id: dotsync
     name_template: >-
       {{ .ProjectName }}_
-      {{- trimPrefix .Tag "dotsync/" }}_
+      {{- trimprefix .Tag "dotsync/" }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
@@ -47,7 +47,7 @@ checksum:
   name_template: checksums.txt
 
 snapshot:
-  version_template: "{{ incpatch (trimPrefix .Tag \"dotsync/\") }}-snapshot"
+  version_template: "{{ incpatch (trimprefix .Tag \"dotsync/\") }}-snapshot"
 
 changelog:
   sort: asc
@@ -64,16 +64,16 @@ dockers_v2:
     images:
       - "ghcr.io/smykla-labs/dotsync"
     tags:
-      - "{{ trimPrefix .Tag \"dotsync/\" }}"
-      - "{{ (semver (trimPrefix .Tag \"dotsync/\")).Major }}"
-      - "{{ (semver (trimPrefix .Tag \"dotsync/\")).Major }}.{{ (semver (trimPrefix .Tag \"dotsync/\")).Minor }}"
+      - "{{ trimprefix .Tag \"dotsync/\" }}"
+      - "{{ (semver (trimprefix .Tag \"dotsync/\")).Major }}"
+      - "{{ (semver (trimprefix .Tag \"dotsync/\")).Major }}.{{ (semver (trimprefix .Tag \"dotsync/\")).Minor }}"
       - "latest"
     dockerfile: Dockerfile
     labels:
       "org.opencontainers.image.created": "{{.Date}}"
       "org.opencontainers.image.title": "{{.ProjectName}}"
       "org.opencontainers.image.revision": "{{.FullCommit}}"
-      "org.opencontainers.image.version": "{{ trimPrefix .Tag \"dotsync/\" }}"
+      "org.opencontainers.image.version": "{{ trimprefix .Tag \"dotsync/\" }}"
       "org.opencontainers.image.source": "https://github.com/smykla-labs/.github"
       "org.opencontainers.image.description": "Organization sync tool for labels, files, and smyklot versions"
       "org.opencontainers.image.licenses": "MIT"
@@ -88,10 +88,10 @@ release:
   prerelease: auto
   mode: replace
   header: |
-    ## dotsync {{ trimPrefix .Tag "dotsync/" }}
+    ## dotsync {{ trimprefix .Tag "dotsync/" }}
 
     Container images available at:
-    - `ghcr.io/smykla-labs/dotsync:{{ trimPrefix .Tag "dotsync/" }}`
-    - `ghcr.io/smykla-labs/dotsync:{{ (semver (trimPrefix .Tag "dotsync/")).Major }}`
-    - `ghcr.io/smykla-labs/dotsync:{{ (semver (trimPrefix .Tag "dotsync/")).Major }}.{{ (semver (trimPrefix .Tag "dotsync/")).Minor }}`
+    - `ghcr.io/smykla-labs/dotsync:{{ trimprefix .Tag "dotsync/" }}`
+    - `ghcr.io/smykla-labs/dotsync:{{ (semver (trimprefix .Tag "dotsync/")).Major }}`
+    - `ghcr.io/smykla-labs/dotsync:{{ (semver (trimprefix .Tag "dotsync/")).Major }}.{{ (semver (trimprefix .Tag "dotsync/")).Minor }}`
     - `ghcr.io/smykla-labs/dotsync:latest`
