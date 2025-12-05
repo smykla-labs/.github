@@ -574,6 +574,54 @@ settings, and smyklot version references.`,
 	},
 }
 
+// Cobra command definitions
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Show version information",
+	Long:  "Display the current version of dotsync",
+	RunE: func(_ *cobra.Command, _ []string) error {
+		fmt.Printf("dotsync version %s\n", version)
+		return nil
+	},
+}
+
+var labelsCmd = &cobra.Command{
+	Use:   "labels",
+	Short: "Label synchronization commands",
+	Long:  "Commands for synchronizing GitHub labels across repositories",
+}
+
+var filesCmd = &cobra.Command{
+	Use:   "files",
+	Short: "File synchronization commands",
+	Long:  "Commands for synchronizing files across repositories",
+}
+
+var smyklotCmd = &cobra.Command{
+	Use:   "smyklot",
+	Short: "Smyklot version synchronization commands",
+	Long:  "Commands for synchronizing smyklot version references across repositories",
+}
+
+var settingsCmd = &cobra.Command{
+	Use:   "settings",
+	Short: "Repository settings synchronization commands",
+	Long:  "Commands for synchronizing repository settings across repositories",
+}
+
+var reposCmd = &cobra.Command{
+	Use:   "repos",
+	Short: "Repository listing commands",
+	Long:  "Commands for listing and querying organization repositories",
+}
+
+var configCmd = &cobra.Command{
+	Use:   "config",
+	Short: "Configuration schema commands",
+	Long:  "Commands for managing sync configuration schemas",
+}
+
 func init() {
 	// Add persistent flags (global flags available to all commands)
 	rootCmd.PersistentFlags().String("log-level", "info", "Log level (trace|debug|info|warn|error)")
@@ -581,6 +629,15 @@ func init() {
 	rootCmd.PersistentFlags().Bool("dry-run", false, "Preview changes without applying them")
 	rootCmd.PersistentFlags().Bool("github-output", false, "Write outputs to GITHUB_OUTPUT for GitHub Actions")
 	rootCmd.PersistentFlags().String("org", "smykla-labs", "GitHub organization")
+
+	// Add commands to root
+	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(labelsCmd)
+	rootCmd.AddCommand(filesCmd)
+	rootCmd.AddCommand(smyklotCmd)
+	rootCmd.AddCommand(settingsCmd)
+	rootCmd.AddCommand(reposCmd)
+	rootCmd.AddCommand(configCmd)
 }
 
 func main() {
