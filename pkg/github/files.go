@@ -47,7 +47,7 @@ type FileSyncStats struct {
 	CreatedFiles     []string
 	UpdatedFiles     []string
 	DeletedFiles     []string
-	MergedFiles      []string
+	MergedFiles      map[string]string // path -> strategy
 }
 
 // SyncFiles synchronizes files from a central repo to a target repository.
@@ -92,7 +92,9 @@ func SyncFiles(
 	}
 
 	// Process files
-	stats := &FileSyncStats{}
+	stats := &FileSyncStats{
+		MergedFiles: make(map[string]string),
+	}
 
 	var changes []FileChange
 
@@ -233,7 +235,8 @@ func processFileMapping(
 
 	// Check for merge configuration
 	mergeConfig := syncConfig.GetMergeConfig(mapping.Dest)
-	isMerged := false
+
+	var mergeStrategy config.MergeStrategy
 
 	if mergeConfig != nil {
 		log.Debug(
@@ -252,7 +255,7 @@ func processFileMapping(
 		} else {
 			// Use merged content
 			sourceContent = mergedContent
-			isMerged = true
+			mergeStrategy = mergeConfig.Strategy
 		}
 	}
 
@@ -266,13 +269,13 @@ func processFileMapping(
 			mapping,
 			sourceContent,
 			targetContent,
-			isMerged,
+			mergeStrategy,
 			stats,
 			changes,
 		)
 	}
 
-	return processNewFile(log, mapping, sourceContent, isMerged, stats, changes)
+	return processNewFile(log, mapping, sourceContent, mergeStrategy, stats, changes)
 }
 
 // processExistingFile handles updates to existing files.
@@ -285,7 +288,7 @@ func processExistingFile(
 	mapping FileMapping,
 	sourceContent []byte,
 	targetContent []byte,
-	isMerged bool,
+	mergeStrategy config.MergeStrategy,
 	stats *FileSyncStats,
 	changes []FileChange,
 ) []FileChange {
@@ -299,7 +302,7 @@ func processExistingFile(
 	}
 
 	// Special case: renovate.json - check for manual modifications (only if not merged)
-	if mapping.Dest == "renovate.json" && !isMerged {
+	if mapping.Dest == "renovate.json" && mergeStrategy == "" {
 		if shouldSkipRenovateJSON(ctx, log, client, org, repo, mapping.Dest, stats) {
 			return changes
 		}
@@ -310,8 +313,8 @@ func processExistingFile(
 	stats.Updated++
 	stats.UpdatedFiles = append(stats.UpdatedFiles, mapping.Dest)
 
-	if isMerged {
-		stats.MergedFiles = append(stats.MergedFiles, mapping.Dest)
+	if mergeStrategy != "" {
+		stats.MergedFiles[mapping.Dest] = string(mergeStrategy)
 	}
 
 	return append(changes, FileChange{
@@ -326,7 +329,7 @@ func processNewFile(
 	log *logger.Logger,
 	mapping FileMapping,
 	sourceContent []byte,
-	isMerged bool,
+	mergeStrategy config.MergeStrategy,
 	stats *FileSyncStats,
 	changes []FileChange,
 ) []FileChange {
@@ -335,8 +338,8 @@ func processNewFile(
 	stats.Created++
 	stats.CreatedFiles = append(stats.CreatedFiles, mapping.Dest)
 
-	if isMerged {
-		stats.MergedFiles = append(stats.MergedFiles, mapping.Dest)
+	if mergeStrategy != "" {
+		stats.MergedFiles[mapping.Dest] = string(mergeStrategy)
 	}
 
 	return append(changes, FileChange{
@@ -1022,6 +1025,15 @@ func buildPRBody(org string, sourceRepo string, stats *FileSyncStats) string {
 
 		for _, file := range stats.UpdatedFiles {
 			body.WriteString(fmt.Sprintf("- `%s`\n", file))
+		}
+	}
+
+	// Files merged section
+	if len(stats.MergedFiles) > 0 {
+		body.WriteString("\n## Files Merged with Repo Overrides\n\n")
+
+		for file, strategy := range stats.MergedFiles {
+			body.WriteString(fmt.Sprintf("- `%s` (%s strategy)\n", file, strategy))
 		}
 	}
 
