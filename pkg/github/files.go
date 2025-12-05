@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 
 	"github.com/smykla-labs/.github/internal/configtypes"
 	"github.com/smykla-labs/.github/pkg/logger"
+	"github.com/smykla-labs/.github/pkg/merge"
 )
 
 const (
@@ -45,6 +47,7 @@ type FileSyncStats struct {
 	CreatedFiles     []string
 	UpdatedFiles     []string
 	DeletedFiles     []string
+	MergedFiles      []string
 }
 
 // SyncFiles synchronizes files from a central repo to a target repository.
@@ -228,13 +231,48 @@ func processFileMapping(
 		return changes
 	}
 
+	// Check for merge configuration
+	mergeConfig := syncConfig.GetMergeConfig(mapping.Dest)
+	isMerged := false
+
+	if mergeConfig != nil {
+		log.Debug(
+			"found merge config for file",
+			"file", mapping.Dest,
+			"strategy", mergeConfig.Strategy,
+		)
+
+		// Apply merge
+		mergedContent, mergeErr := applyMerge(
+			log, sourceContent, targetContent, targetExists, mapping.Dest, mergeConfig,
+		)
+		if mergeErr != nil {
+			log.Warn("failed to apply merge, falling back to replacement",
+				"file", mapping.Dest, "error", mergeErr)
+		} else {
+			// Use merged content
+			sourceContent = mergedContent
+			isMerged = true
+		}
+	}
+
 	if targetExists {
 		return processExistingFile(
-			ctx, log, client, org, repo, mapping, sourceContent, targetContent, stats, changes,
+			ctx,
+			log,
+			client,
+			org,
+			repo,
+			mapping,
+			sourceContent,
+			targetContent,
+			isMerged,
+			stats,
+			changes,
 		)
 	}
 
-	return processNewFile(log, mapping, sourceContent, stats, changes)
+	return processNewFile(log, mapping, sourceContent, isMerged, stats, changes)
 }
 
 // processExistingFile handles updates to existing files.
@@ -247,6 +285,7 @@ func processExistingFile(
 	mapping FileMapping,
 	sourceContent []byte,
 	targetContent []byte,
+	isMerged bool,
 	stats *FileSyncStats,
 	changes []FileChange,
 ) []FileChange {
@@ -259,8 +298,8 @@ func processExistingFile(
 		return changes
 	}
 
-	// Special case: renovate.json - check for manual modifications
-	if mapping.Dest == "renovate.json" {
+	// Special case: renovate.json - check for manual modifications (only if not merged)
+	if mapping.Dest == "renovate.json" && !isMerged {
 		if shouldSkipRenovateJSON(ctx, log, client, org, repo, mapping.Dest, stats) {
 			return changes
 		}
@@ -270,6 +309,10 @@ func processExistingFile(
 
 	stats.Updated++
 	stats.UpdatedFiles = append(stats.UpdatedFiles, mapping.Dest)
+
+	if isMerged {
+		stats.MergedFiles = append(stats.MergedFiles, mapping.Dest)
+	}
 
 	return append(changes, FileChange{
 		Path:    mapping.Dest,
@@ -283,6 +326,7 @@ func processNewFile(
 	log *logger.Logger,
 	mapping FileMapping,
 	sourceContent []byte,
+	isMerged bool,
 	stats *FileSyncStats,
 	changes []FileChange,
 ) []FileChange {
@@ -290,6 +334,10 @@ func processNewFile(
 
 	stats.Created++
 	stats.CreatedFiles = append(stats.CreatedFiles, mapping.Dest)
+
+	if isMerged {
+		stats.MergedFiles = append(stats.MergedFiles, mapping.Dest)
+	}
 
 	return append(changes, FileChange{
 		Path:    mapping.Dest,
@@ -343,6 +391,92 @@ func parseFilesConfig(filesConfig string) ([]FileMapping, error) {
 // isExcluded checks if a file is in the exclusion list.
 func isExcluded(path string, exclude []string) bool {
 	return slices.Contains(exclude, path)
+}
+
+// applyMerge applies merge configuration to file content.
+func applyMerge(
+	log *logger.Logger,
+	sourceContent []byte,
+	targetContent []byte,
+	targetExists bool,
+	path string,
+	mergeConfig *config.FileMergeConfig,
+) ([]byte, error) {
+	// Detect file type based on extension
+	ext := filepath.Ext(path)
+
+	var (
+		parseFunc   func([]byte) (map[string]any, error)
+		marshalFunc func(map[string]any) ([]byte, error)
+		mergeFunc   func(map[string]any, map[string]any, config.MergeStrategy) (map[string]any, error)
+		isJSON      bool
+	)
+
+	switch strings.ToLower(ext) {
+	case ".json":
+		parseFunc = merge.ParseJSON
+		marshalFunc = merge.MarshalJSON
+		mergeFunc = merge.MergeJSON
+		isJSON = true
+	case ".yml", ".yaml":
+		parseFunc = merge.ParseYAML
+		marshalFunc = merge.MarshalYAML
+		mergeFunc = merge.MergeYAML
+		isJSON = false
+	default:
+		return nil, errors.Wrapf(
+			merge.ErrMergeUnsupportedFileType,
+			"file: %s, extension: %s",
+			path,
+			ext,
+		)
+	}
+
+	// Parse source (org template)
+	sourceMap, err := parseFunc(sourceContent)
+	if err != nil {
+		return nil, errors.Wrapf(err, "parsing source file %s", path)
+	}
+
+	// Start with source as base
+	base := sourceMap
+
+	// If target exists in repo, use it as base instead
+	if targetExists {
+		var targetMap map[string]any
+
+		targetMap, err = parseFunc(targetContent)
+		if err != nil {
+			return nil, errors.Wrapf(err, "parsing target file %s", path)
+		}
+
+		base = targetMap
+	}
+
+	// Apply merge: base (repo or org) + overrides
+	var result map[string]any
+
+	result, err = mergeFunc(base, mergeConfig.Overrides, mergeConfig.Strategy)
+	if err != nil {
+		return nil, errors.Wrapf(err, "merging file %s", path)
+	}
+
+	// Marshal back to bytes
+	var mergedContent []byte
+
+	mergedContent, err = marshalFunc(result)
+	if err != nil {
+		return nil, errors.Wrapf(err, "marshaling merged file %s", path)
+	}
+
+	// For JSON, add newline at end for better git diffs
+	if isJSON {
+		mergedContent = append(mergedContent, '\n')
+	}
+
+	log.Debug("applied merge", "file", path, "strategy", mergeConfig.Strategy)
+
+	return mergedContent, nil
 }
 
 // fetchFileContent fetches file content from a repository.

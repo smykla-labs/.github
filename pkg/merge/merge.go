@@ -10,7 +10,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/smykla-labs/.github/pkg/config"
-	"github.com/smykla-labs/.github/pkg/github"
 )
 
 // DeepMerge recursively merges two maps using RFC 7396 JSON Merge Patch semantics.
@@ -38,13 +37,13 @@ func DeepMerge(base, override map[string]any) (map[string]any, error) {
 	// Convert maps to JSON
 	baseJSON, err := json.Marshal(base)
 	if err != nil {
-		return nil, errors.Wrap(github.ErrMergeParseError, "marshaling base map to JSON")
+		return nil, errors.Wrap(ErrMergeParseError, "marshaling base map to JSON")
 	}
 
 	overrideJSON, err := json.Marshal(override)
 	if err != nil {
 		return nil, errors.Wrap(
-			github.ErrMergeParseError,
+			ErrMergeParseError,
 			"marshaling override map to JSON",
 		)
 	}
@@ -52,14 +51,14 @@ func DeepMerge(base, override map[string]any) (map[string]any, error) {
 	// Apply RFC 7396 merge patch
 	mergedJSON, err := jsonpatch.MergePatch(baseJSON, overrideJSON)
 	if err != nil {
-		return nil, errors.Wrap(github.ErrMergeParseError, "applying merge patch")
+		return nil, errors.Wrap(ErrMergeParseError, "applying merge patch")
 	}
 
 	// Convert back to map
 	var result map[string]any
 	if err := json.Unmarshal(mergedJSON, &result); err != nil {
 		return nil, errors.Wrap(
-			github.ErrMergeParseError,
+			ErrMergeParseError,
 			"unmarshaling merged JSON to map",
 		)
 	}
@@ -116,7 +115,7 @@ func MergeJSON(
 		return ShallowMerge(base, override)
 	default:
 		return nil, errors.Wrapf(
-			github.ErrMergeUnknownStrategy,
+			ErrMergeUnknownStrategy,
 			"strategy: %q",
 			strategy,
 		)
@@ -137,7 +136,7 @@ func MergeYAML(
 func ParseJSON(data []byte) (map[string]any, error) {
 	var result map[string]any
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, errors.Wrap(github.ErrMergeParseError, "parsing JSON")
+		return nil, errors.Wrap(ErrMergeParseError, "parsing JSON")
 	}
 
 	return result, nil
@@ -147,7 +146,7 @@ func ParseJSON(data []byte) (map[string]any, error) {
 func ParseYAML(data []byte) (map[string]any, error) {
 	var result map[string]any
 	if err := yaml.Unmarshal(data, &result); err != nil {
-		return nil, errors.Wrap(github.ErrMergeParseError, "parsing YAML")
+		return nil, errors.Wrap(ErrMergeParseError, "parsing YAML")
 	}
 
 	return result, nil
@@ -157,7 +156,7 @@ func ParseYAML(data []byte) (map[string]any, error) {
 func MarshalJSON(data map[string]any) ([]byte, error) {
 	result, err := json.Marshal(data)
 	if err != nil {
-		return nil, errors.Wrap(github.ErrMergeParseError, "marshaling to JSON")
+		return nil, errors.Wrap(ErrMergeParseError, "marshaling to JSON")
 	}
 
 	return result, nil
@@ -167,7 +166,7 @@ func MarshalJSON(data map[string]any) ([]byte, error) {
 func MarshalYAML(data map[string]any) ([]byte, error) {
 	result, err := yaml.Marshal(data)
 	if err != nil {
-		return nil, errors.Wrap(github.ErrMergeParseError, "marshaling to YAML")
+		return nil, errors.Wrap(ErrMergeParseError, "marshaling to YAML")
 	}
 
 	return result, nil
