@@ -33,33 +33,33 @@ inputs:
     default: ""
 
   # Common with INPUT_* fallback only (flag → INPUT_*)
-  dry-run:
+  dry_run:
     description: Dry run mode - preview changes without making them
     required: false
     default: "false"
-  sync-config:
+  sync_config:
     description: JSON sync config from get-sync-config action
     required: false
     default: "{}"
 
   # Command-specific inputs
-  labels-file:
+  labels_file:
     description: Path to labels YAML file (labels sync)
     required: false
     default: ""
-  settings-file:
+  settings_file:
     description: Path to settings YAML file (settings sync)
     required: false
     default: ""
-  files-config:
+  files_config:
     description: JSON config with files to sync (files sync)
     required: false
     default: ""
-  branch-prefix:
+  branch_prefix:
     description: Git branch prefix for file sync PRs (files sync)
     required: false
     default: ""
-  pr-labels:
+  pr_labels:
     description: Comma-separated labels for file sync PRs (files sync)
     required: false
     default: ""
@@ -71,7 +71,7 @@ inputs:
     description: Smyklot git tag to sync (smyklot sync)
     required: false
     default: ""
-  templates-dir:
+  templates_dir:
     description: Path to templates directory (files discover)
     required: false
     default: ""
@@ -79,7 +79,7 @@ inputs:
     description: Output format for repos list (json|names)
     required: false
     default: ""
-  schema-file:
+  schema_file:
     description: Path to schema file (config verify)
     required: false
     default: ""

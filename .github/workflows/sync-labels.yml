@@ -73,5 +73,5 @@ jobs:
           subcommand: sync
           token: ${{ steps.token.outputs.token }}
           repo: ${{ matrix.repo.name }}
-          labels-file: .github/labels.yml
-          dry-run: ${{ inputs.dry_run || 'false' }}
+          labels_file: .github/labels.yml
+          dry_run: ${{ inputs.dry_run || 'false' }}

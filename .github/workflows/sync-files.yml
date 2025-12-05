@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       repos: ${{ steps.repos.outputs.repos }}
-      files-config: ${{ steps.files.outputs.config }}
+      files_config: ${{ steps.files.outputs.config }}
     steps:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -50,7 +50,7 @@ jobs:
         with:
           command: files
           subcommand: discover
-          templates-dir: templates
+          templates_dir: templates
 
   sync-files:
     needs: prepare
@@ -82,5 +82,5 @@ jobs:
           subcommand: sync
           token: ${{ steps.token.outputs.token }}
           repo: ${{ matrix.repo.name }}
-          files-config: ${{ needs.prepare.outputs.files-config }}
-          dry-run: ${{ inputs.dry_run || 'false' }}
+          files_config: ${{ needs.prepare.outputs.files_config }}
+          dry_run: ${{ inputs.dry_run || 'false' }}

@@ -73,5 +73,5 @@ jobs:
           subcommand: sync
           token: ${{ steps.token.outputs.token }}
           repo: ${{ matrix.repo.name }}
-          settings-file: .github/settings.yml
-          dry-run: ${{ inputs.dry_run || 'false' }}
+          settings_file: .github/settings.yml
+          dry_run: ${{ inputs.dry_run || 'false' }}
