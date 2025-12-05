@@ -35,9 +35,10 @@ settings:
     secret_scanning_push_protection: enabled    # Block pushes with secrets
     dependabot_security_updates: enabled        # Auto security updates
 
-  # Branch Protection Rules
-  # -----------------------
-  # Protect critical branches from force pushes and require reviews
+  # Branch Protection Rules (Legacy)
+  # ---------------------------------
+  # NOTE: Rulesets (below) are the modern replacement for branch protection.
+  # Both coexist during gradual migration. Consider migrating to rulesets.
   branch_protection:
     # Main branch protection
     - pattern: "main"
@@ -53,3 +54,52 @@ settings:
       allow_force_pushes: false                 # Block force pushes
       allow_deletions: false                    # Block branch deletion
       required_conversation_resolution: true    # Require all review threads resolved
+
+  # Repository Rulesets (Modern)
+  # ----------------------------
+  # Modern replacement for branch protection with granular targeting and better bypass management.
+  # Rulesets provide more flexibility and additional rule types compared to branch protection.
+  rulesets:
+    # Main branch ruleset
+    - name: "main-branch-protection"
+      target: "branch"
+      enforcement: "active"
+      conditions:
+        ref_name:
+          include:
+            - "refs/heads/main"
+      bypass_actors:
+        # Organization admins can always bypass (for emergency fixes)
+        - actor_id: 5           # OrganizationAdmin role ID
+          actor_type: "OrganizationAdmin"
+          bypass_mode: "always"
+        # smyklot bot can bypass for automated updates
+        - actor_id: 1197525     # smyklot GitHub App integration ID
+          actor_type: "Integration"
+          bypass_mode: "pull_request"
+      rules:
+        # Pull request requirements
+        pull_request:
+          required_approving_review_count: 1
+          dismiss_stale_reviews_on_push: true
+          require_code_owner_review: false
+          require_last_push_approval: true
+          required_review_thread_resolution: true
+          allowed_merge_methods:
+            - "squash"
+        # Required status checks
+        required_status_checks:
+          strict_required_status_checks_policy: true
+          required_status_checks: []    # Empty = inherit repo's existing checks
+        # Prevent destructive operations
+        deletion: true
+        non_fast_forward: true
+        # Require commit quality standards
+        required_linear_history: true
+        required_signatures: true
+        # Code scanning requirements
+        code_scanning:
+          code_scanning_tools:
+            - tool: "CodeQL"
+              alerts_threshold: "errors"
+              security_alerts_threshold: "high_or_higher"
