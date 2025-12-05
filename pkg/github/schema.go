@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/cockroachdb/errors"
-	"github.com/google/go-github/v79/github"
+	"github.com/google/go-github/v80/github"
 )
 
 // VerifyAndCommitSchema verifies schema is in sync and commits if needed.
@@ -160,8 +160,7 @@ Schema was out of sync with Go types. Regenerated using:
 		Force: github.Ptr(false),
 	}
 
-	_, _, err = client.Git.UpdateRef(ctx, owner, name, "heads/"+branch, updateRef)
-	if err != nil {
+	if _, _, err := client.Git.UpdateRef(ctx, owner, name, "heads/"+branch, updateRef); err != nil {
 		return false, errors.Wrap(err, "updating ref")
 	}
 

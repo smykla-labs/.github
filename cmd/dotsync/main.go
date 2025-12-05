@@ -11,6 +11,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/cockroachdb/errors"
 	"github.com/invopop/jsonschema"
+
 	"github.com/smykla-labs/.github/pkg/config"
 	"github.com/smykla-labs/.github/pkg/github"
 	"github.com/smykla-labs/.github/pkg/logger"
@@ -20,17 +21,18 @@ var version = "dev"
 
 // CLI defines the command-line interface structure.
 type CLI struct {
-	LogLevel     string     `help:"Log level (trace|debug|info|warn|error)" default:"info" enum:"trace,debug,info,warn,error"`
-	UseGHAuth    bool       `help:"Use 'gh auth token' for authentication"`
-	DryRun       bool       `help:"Preview changes without applying them"`
-	GitHubOutput bool       `name:"github-output" help:"Write outputs to GITHUB_OUTPUT for GitHub Actions"`
-	Org          string     `help:"GitHub organization" default:"smykla-labs"`
-	Version      VersionCmd `cmd:"" help:"Show version information"`
-	Labels       LabelsCmd  `cmd:"" help:"Label synchronization commands"`
-	Files        FilesCmd   `cmd:"" help:"File synchronization commands"`
-	Smyklot      SmyklotCmd `cmd:"" help:"Smyklot version synchronization commands"`
-	Repos        ReposCmd   `cmd:"" help:"Repository listing commands"`
-	Config       ConfigCmd  `cmd:"" help:"Configuration schema commands"`
+	LogLevel     string      `help:"Log level (trace|debug|info|warn|error)" default:"info" enum:"trace,debug,info,warn,error"`
+	UseGHAuth    bool        `help:"Use 'gh auth token' for authentication"`
+	DryRun       bool        `help:"Preview changes without applying them"`
+	GitHubOutput bool        `name:"github-output" help:"Write outputs to GITHUB_OUTPUT for GitHub Actions"`
+	Org          string      `help:"GitHub organization" default:"smykla-labs"`
+	Version      VersionCmd  `cmd:"" help:"Show version information"`
+	Labels       LabelsCmd   `cmd:"" help:"Label synchronization commands"`
+	Files        FilesCmd    `cmd:"" help:"File synchronization commands"`
+	Smyklot      SmyklotCmd  `cmd:"" help:"Smyklot version synchronization commands"`
+	Settings     SettingsCmd `cmd:"" help:"Repository settings synchronization commands"`
+	Repos        ReposCmd    `cmd:"" help:"Repository listing commands"`
+	Config       ConfigCmd   `cmd:"" help:"Configuration schema commands"`
 }
 
 // VersionCmd shows version information.
@@ -314,6 +316,66 @@ func (c *SmyklotSyncCmd) Run(ctx context.Context, cli *CLI) error {
 	return nil
 }
 
+// SettingsCmd contains settings sync subcommands.
+type SettingsCmd struct {
+	Sync SettingsSyncCmd `cmd:"" help:"Sync settings to a repository"`
+}
+
+// SettingsSyncCmd syncs repository settings to a repository.
+type SettingsSyncCmd struct {
+	Repo         string `help:"Target repository (e.g., 'myrepo')" required:""`
+	SettingsFile string `help:"Path to settings YAML file" required:""`
+	Config       string `help:"JSON sync config (optional)"`
+}
+
+// Run executes the settings sync command.
+func (c *SettingsSyncCmd) Run(ctx context.Context, cli *CLI) error {
+	log := logger.FromContext(ctx)
+
+	log.Info("starting settings sync",
+		"org", cli.Org,
+		"repo", c.Repo,
+		"settings_file", c.SettingsFile,
+		"dry_run", cli.DryRun,
+	)
+
+	// Get GitHub token
+	token, err := github.GetToken(ctx, log, cli.UseGHAuth)
+	if err != nil {
+		return err
+	}
+
+	// Create GitHub client
+	client, err := github.NewClient(ctx, log, token)
+	if err != nil {
+		return err
+	}
+
+	// Parse sync config
+	syncConfig, err := config.ParseSyncConfigJSON(c.Config)
+	if err != nil {
+		return err
+	}
+
+	// Sync settings
+	if err := github.SyncSettings(
+		ctx,
+		log,
+		client,
+		cli.Org,
+		c.Repo,
+		c.SettingsFile,
+		syncConfig,
+		cli.DryRun,
+	); err != nil {
+		return err
+	}
+
+	log.Info("settings sync completed successfully")
+
+	return nil
+}
+
 // ReposCmd contains repository listing subcommands.
 type ReposCmd struct {
 	List ReposListCmd `cmd:"" help:"List organization repositories"`
@@ -587,11 +649,7 @@ func main() {
 		kong.BindTo(appCtx, (*context.Context)(nil)),
 	)
 
-	log := logger.New(cli.LogLevel)
+	kongCtx.BindTo(logger.WithContext(appCtx, logger.New(cli.LogLevel)), (*context.Context)(nil))
 
-	appCtx = logger.WithContext(appCtx, log)
-	kongCtx.BindTo(appCtx, (*context.Context)(nil))
-
-	err := kongCtx.Run(&cli)
-	kongCtx.FatalIfErrorf(err)
+	kongCtx.FatalIfErrorf(kongCtx.Run(&cli))
 }

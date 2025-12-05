@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/cockroachdb/errors"
-	"github.com/google/go-github/v79/github"
+	"github.com/google/go-github/v80/github"
 	"gopkg.in/yaml.v3"
 
 	"github.com/smykla-labs/.github/pkg/config"
