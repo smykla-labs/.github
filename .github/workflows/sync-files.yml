@@ -57,7 +57,7 @@ jobs:
       matrix:
         repo: ${{ fromJSON(needs.prepare.outputs.repos) }}
     concurrency:
-      group: sync-files-${{ matrix.repo }}
+      group: sync-files-${{ matrix.repo.name }}
       cancel-in-progress: false
     steps:
       - name: Checkout
@@ -70,13 +70,13 @@ jobs:
           app-id: ${{ vars.SMYKLOT_APP_ID }}
           private-key: ${{ secrets.SMYKLOT_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: ${{ matrix.repo }}
+          repositories: ${{ matrix.repo.name }}
 
       - name: Sync files
         uses: ./.github/actions/dotsync-files
         with:
           token: ${{ steps.token.outputs.token }}
           org: ${{ github.repository_owner }}
-          repo: ${{ matrix.repo }}
+          repo: ${{ matrix.repo.name }}
           files-config: ${{ needs.prepare.outputs.files-config }}
           dry-run: ${{ inputs.dry_run || 'false' }}

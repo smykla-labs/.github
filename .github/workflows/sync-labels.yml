@@ -46,7 +46,7 @@ jobs:
     needs: get-repos
     runs-on: ubuntu-24.04
     concurrency:
-      group: sync-labels-${{ matrix.repo }}
+      group: sync-labels-${{ matrix.repo.name }}
       cancel-in-progress: false
     strategy:
       fail-fast: false
@@ -63,13 +63,13 @@ jobs:
           app-id: ${{ vars.SMYKLOT_APP_ID }}
           private-key: ${{ secrets.SMYKLOT_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: ${{ matrix.repo }}
+          repositories: ${{ matrix.repo.name }}
 
       - name: Sync labels to repository
         uses: ./.github/actions/dotsync-labels
         with:
           token: ${{ steps.token.outputs.token }}
           org: ${{ github.repository_owner }}
-          repo: ${{ matrix.repo }}
+          repo: ${{ matrix.repo.name }}
           labels-file: .github/labels.yml
           dry-run: ${{ inputs.dry_run || 'false' }}
