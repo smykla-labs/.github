@@ -25,6 +25,7 @@ type SettingsDefinition struct {
 	Features         config.FeaturesConfig               `yaml:"features"`
 	Security         config.SecurityConfig               `yaml:"security"`
 	BranchProtection []config.BranchProtectionRuleConfig `yaml:"branch_protection"`
+	Rulesets         []config.RulesetConfig              `yaml:"rulesets"`
 }
 
 // SyncSettings synchronizes repository settings from a YAML file to a target repository.
@@ -63,22 +64,41 @@ func SyncSettings(
 		"has_branch_protection", hasBranchProtectionChanges,
 	)
 
-	// Handle dry-run mode
+	// Handle dry-run mode or apply changes
 	if dryRun {
-		return handleDryRun(log, repoChanges, hasBranchProtectionChanges, desiredSettings)
+		err = handleDryRun(log, repoChanges, hasBranchProtectionChanges, desiredSettings)
+	} else {
+		err = applyAllSettingsChanges(
+			ctx,
+			log,
+			client,
+			org,
+			repo,
+			repoChanges,
+			hasBranchProtectionChanges,
+			desiredSettings.BranchProtection,
+		)
 	}
 
-	// Apply changes
-	return applyAllSettingsChanges(
+	if err != nil {
+		return err
+	}
+
+	// Sync rulesets
+	if err := SyncRulesets(
 		ctx,
 		log,
 		client,
 		org,
 		repo,
-		repoChanges,
-		hasBranchProtectionChanges,
-		desiredSettings.BranchProtection,
-	)
+		desiredSettings.Rulesets,
+		syncConfig.Sync.Settings.Exclude,
+		dryRun,
+	); err != nil {
+		return errors.Wrap(err, "syncing rulesets")
+	}
+
+	return nil
 }
 
 // loadSettings loads desired settings from file and fetches current repository state.
@@ -126,6 +146,8 @@ func computeAllSettingsChanges(
 }
 
 // handleDryRun logs planned changes without applying them.
+//
+//nolint:unparam // error return kept for consistency with applyAllSettingsChanges signature
 func handleDryRun(
 	log *logger.Logger,
 	repoChanges *github.Repository,

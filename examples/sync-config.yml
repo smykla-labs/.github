@@ -85,7 +85,7 @@
 # sync.settings.exclude (array of strings, default: [])
 #   List of settings paths to exclude from synchronization.
 #   Paths use dot notation to reference nested fields.
-#   Examples: ["branch_protection", "security.secret_scanning", "features.has_wiki"]
+#   Examples: ["branch_protection", "rulesets", "security.secret_scanning", "features.has_wiki"]
 #   Entire sections or individual fields can be excluded.
 #
 # ---------------------------------------------------------------------------
@@ -136,11 +136,12 @@ sync: {}
 #   settings:
 #     skip: true
 
-# Example 8: Exclude specific settings (keep custom branch protection)
+# Example 8: Exclude specific settings (keep custom branch protection and rulesets)
 # sync:
 #   settings:
 #     exclude:
 #       - "branch_protection"          # Keep all custom branch protection rules
+#       - "rulesets"                   # Keep all custom rulesets (modern protection)
 #       - "security.secret_scanning"   # Keep custom secret scanning config
 #       - "features.has_wiki"          # Keep wiki enabled
 
@@ -165,4 +166,5 @@ sync: {}
 #   settings:
 #     skip: false
 #     exclude:
+#       - "rulesets"
 #       - "features.has_discussions"
