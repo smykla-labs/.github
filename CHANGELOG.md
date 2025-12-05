@@ -1,3 +1,11 @@
+## [1.2.2](https://github.com/smykla-labs/.github/compare/dotsync/v1.2.1...dotsync/v1.2.2) (2025-12-05)
+
+### Bug Fixes
+
+* **actions:** use snake_case for action inputs ([3f1f20d](https://github.com/smykla-labs/.github/commit/3f1f20dc712ab44b0b5d7b000c0ef2adb6e93355))
+* **release:** prevent duplicate changelog titles ([e36f1e8](https://github.com/smykla-labs/.github/commit/e36f1e8cb78eb402621c83087664931e58132ae8))
+* **release:** remove invalid empty changelogTitle ([ab483a9](https://github.com/smykla-labs/.github/commit/ab483a91729db993105663e11a3e3a37876208fc))
+
 <!-- markdownlint-disable MD024 -->
 
 # Changelog
