@@ -9,7 +9,7 @@ Organization-wide defaults and synchronization for smykla-labs repositories. Thi
 1. **Community Health Files** - Provides default templates for all smykla-labs repos (CODE_OF_CONDUCT, CONTRIBUTING, SECURITY, issue/PR templates)
 2. **Label Sync** - Automated synchronization of GitHub labels across all repositories using custom composite action
 3. **File Sync** - Automated synchronization of specified files across repositories using custom composite action
-4. **Settings Sync** - Automated synchronization of repository settings (branch protection, security, merge strategies, features) across all repositories
+4. **Settings Sync** - Automated synchronization of repository settings (branch protection, rulesets, security, merge strategies, features) across all repositories
 5. **Smyklot Sync** - Automated synchronization of smyklot version references in workflow files
 6. **Reusable Workflows** - Shared CI/CD workflows for Go projects (lint, test, build, release)
 
@@ -141,7 +141,7 @@ Example usage:
 - **CLI Command**: `dotsync settings sync`
 - **Config**: `.github/settings.yml` (central) + per-repo `.github/sync-config.yml`
 - **Method**: Direct API updates via go-github SDK
-- **Features**: Branch protection, security settings, merge strategies, repository features, no-downgrade protection, skip flags, exclusions
+- **Features**: Branch protection, rulesets (modern protection), security settings, merge strategies, repository features, no-downgrade protection, skip flags, exclusions
 
 **Smyklot Sync:**
 
@@ -197,14 +197,14 @@ Example usage:
 - **Method**: Go-based CLI using go-github SDK with direct API updates
 - **Features**: No-downgrade protection, GHAS awareness, hybrid status checks, diff-based updates, dry-run support, type-safe operations
 
-**Categories:** Repository settings (merge strategies, auto-merge, branch deletion), features (Issues, Wiki, Projects, Discussions), security (secret scanning, push protection, Dependabot—requires GHAS), branch protection (reviews, status checks, linear history, force push protection)
+**Categories:** Repository settings (merge strategies, auto-merge, branch deletion), features (Issues, Wiki, Projects, Discussions), security (secret scanning, push protection, Dependabot—requires GHAS), branch protection (reviews, status checks, linear history, force push protection), rulesets (modern protection with granular targeting, bypass actors, enforcement modes)
 
 **Key Behaviors:**
 
 - **No-downgrade**: Never reduces security/quality below repo's current settings (e.g., repo with 2 reviews + config says 1 = keeps 2). Central config sets baseline minimums.
 - **GHAS-aware**: If Advanced Security unavailable, logs warning and skips security settings (graceful degradation)
 - **Hybrid status checks**: Empty `contexts: []` inherits repo's existing checks; explicit contexts override
-- **Exclusions**: Dot notation in sync-config.yml (e.g., `"branch_protection"`, `"security.secret_scanning"`, `"features.has_wiki"`)
+- **Exclusions**: Dot notation in sync-config.yml (e.g., `"branch_protection"`, `"rulesets"`, `"security.secret_scanning"`, `"features.has_wiki"`)
 - **Never syncs**: Repository visibility (public/private), GitHub Actions permissions (deferred to future)
 
 ### Smyklot Synchronization
@@ -317,7 +317,8 @@ All workflows use the **smyklot** GitHub App for authentication:
    - `settings.repository` - Merge strategies, branch deletion, auto-merge
    - `settings.features` - Issues, Wiki, Projects, Discussions
    - `settings.security` - Secret scanning, push protection, Dependabot
-   - `settings.branch_protection` - Array of protection rules with patterns
+   - `settings.branch_protection` - Array of protection rules with patterns (legacy)
+   - `settings.rulesets` - Array of ruleset configs with targeting, bypass actors, enforcement modes (modern)
 3. Commit and push to `main` - syncs automatically to all repos
 
 **Note:** Use dry-run mode first to preview changes before applying.
