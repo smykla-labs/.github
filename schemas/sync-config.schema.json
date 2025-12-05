@@ -2,10 +2,11 @@
   "$defs": {
     "FilesConfig": {
       "additionalProperties": false,
+      "description": "Controls which organization template files (CODE_OF_CONDUCT.md, CONTRIBUTING.md, etc.) are synced to this repository, with options to exclude specific files or remove unmanaged files",
       "properties": {
         "allow_removal": {
           "default": false,
-          "description": "DANGEROUS: When true files in this repo that are NOT in the central sync config will be DELETED. This can cause data loss. Strongly recommend keeping this false",
+          "description": "DANGEROUS: When true, files in this repo that are NOT in the central sync config will be DELETED. This can cause data loss. Strongly recommend keeping this false",
           "type": "boolean"
         },
         "exclude": {
@@ -38,10 +39,11 @@
     },
     "LabelsConfig": {
       "additionalProperties": false,
+      "description": "Manages which GitHub labels are synced from central configuration, with options to exclude specific labels or remove labels not in the central config",
       "properties": {
         "allow_removal": {
           "default": false,
-          "description": "When true labels in this repo that are NOT in the central config will be DELETED. Use with caution - this removes custom labels",
+          "description": "When true, labels in this repo that are NOT in the central config will be DELETED. Use with caution - this removes custom labels",
           "type": "boolean"
         },
         "exclude": {
@@ -72,8 +74,30 @@
       },
       "type": "object"
     },
+    "SettingsConfig": {
+      "additionalProperties": false,
+      "description": "Controls synchronization of GitHub repository settings like merge strategies, branch protection, security features, and access controls",
+      "properties": {
+        "exclude": {
+          "description": "Specific settings sections or fields to exclude from sync",
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "skip": {
+          "default": false,
+          "description": "Skip repository settings synchronization. Other sync operations still run unless their respective skip flags are set",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
     "SmyklotConfig": {
       "additionalProperties": false,
+      "description": "Controls automatic updates of smyklot version references in workflow files when new versions are released",
       "properties": {
         "skip": {
           "default": false,
@@ -85,16 +109,18 @@
     },
     "SyncConfig": {
       "additionalProperties": false,
+      "description": "Configuration for controlling organization-wide synchronization of labels, files, smyklot versions, and repository settings across all repositories",
       "properties": {
         "sync": {
           "$ref": "#/$defs/SyncSettings",
-          "description": "Top-level sync configuration controlling label file and smyklot version synchronization behavior"
+          "description": "Top-level sync configuration controlling label, file, and smyklot version synchronization behavior"
         }
       },
       "type": "object"
     },
     "SyncSettings": {
       "additionalProperties": false,
+      "description": "Centralized control for all synchronization operations including labels, files, smyklot versions, and repository settings",
       "properties": {
         "files": {
           "$ref": "#/$defs/FilesConfig",
@@ -104,9 +130,13 @@
           "$ref": "#/$defs/LabelsConfig",
           "description": "Label synchronization configuration"
         },
+        "settings": {
+          "$ref": "#/$defs/SettingsConfig",
+          "description": "Repository settings synchronization configuration"
+        },
         "skip": {
           "default": false,
-          "description": "Skip ALL syncs for this repository. Equivalent to setting labels.skip files.skip and smyklot.skip to true",
+          "description": "Skip ALL syncs for this repository. Equivalent to setting labels.skip, files.skip, smyklot.skip, and settings.skip to true",
           "type": "boolean"
         },
         "smyklot": {

@@ -10,27 +10,29 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/cockroachdb/errors"
-	"github.com/invopop/jsonschema"
+
 	"github.com/smykla-labs/.github/pkg/config"
 	"github.com/smykla-labs/.github/pkg/github"
 	"github.com/smykla-labs/.github/pkg/logger"
+	"github.com/smykla-labs/.github/pkg/schema"
 )
 
 var version = "dev"
 
 // CLI defines the command-line interface structure.
 type CLI struct {
-	LogLevel     string     `help:"Log level (trace|debug|info|warn|error)" default:"info" enum:"trace,debug,info,warn,error"`
-	UseGHAuth    bool       `help:"Use 'gh auth token' for authentication"`
-	DryRun       bool       `help:"Preview changes without applying them"`
-	GitHubOutput bool       `name:"github-output" help:"Write outputs to GITHUB_OUTPUT for GitHub Actions"`
-	Org          string     `help:"GitHub organization" default:"smykla-labs"`
-	Version      VersionCmd `cmd:"" help:"Show version information"`
-	Labels       LabelsCmd  `cmd:"" help:"Label synchronization commands"`
-	Files        FilesCmd   `cmd:"" help:"File synchronization commands"`
-	Smyklot      SmyklotCmd `cmd:"" help:"Smyklot version synchronization commands"`
-	Repos        ReposCmd   `cmd:"" help:"Repository listing commands"`
-	Config       ConfigCmd  `cmd:"" help:"Configuration schema commands"`
+	LogLevel     string      `help:"Log level (trace|debug|info|warn|error)" default:"info" enum:"trace,debug,info,warn,error"`
+	UseGHAuth    bool        `help:"Use 'gh auth token' for authentication"`
+	DryRun       bool        `help:"Preview changes without applying them"`
+	GitHubOutput bool        `name:"github-output" help:"Write outputs to GITHUB_OUTPUT for GitHub Actions"`
+	Org          string      `help:"GitHub organization" default:"smykla-labs"`
+	Version      VersionCmd  `cmd:"" help:"Show version information"`
+	Labels       LabelsCmd   `cmd:"" help:"Label synchronization commands"`
+	Files        FilesCmd    `cmd:"" help:"File synchronization commands"`
+	Smyklot      SmyklotCmd  `cmd:"" help:"Smyklot version synchronization commands"`
+	Settings     SettingsCmd `cmd:"" help:"Repository settings synchronization commands"`
+	Repos        ReposCmd    `cmd:"" help:"Repository listing commands"`
+	Config       ConfigCmd   `cmd:"" help:"Configuration schema commands"`
 }
 
 // VersionCmd shows version information.
@@ -56,6 +58,8 @@ type LabelsSyncCmd struct {
 }
 
 // Run executes the label sync command.
+//
+//nolint:dupl // Similar structure to other sync commands but with different operations
 func (c *LabelsSyncCmd) Run(ctx context.Context, cli *CLI) error {
 	log := logger.FromContext(ctx)
 
@@ -314,6 +318,68 @@ func (c *SmyklotSyncCmd) Run(ctx context.Context, cli *CLI) error {
 	return nil
 }
 
+// SettingsCmd contains settings sync subcommands.
+type SettingsCmd struct {
+	Sync SettingsSyncCmd `cmd:"" help:"Sync settings to a repository"`
+}
+
+// SettingsSyncCmd syncs repository settings to a repository.
+type SettingsSyncCmd struct {
+	Repo         string `help:"Target repository (e.g., 'myrepo')" required:""`
+	SettingsFile string `help:"Path to settings YAML file" required:""`
+	Config       string `help:"JSON sync config (optional)"`
+}
+
+// Run executes the settings sync command.
+//
+//nolint:dupl // Similar structure to other sync commands but with different operations
+func (c *SettingsSyncCmd) Run(ctx context.Context, cli *CLI) error {
+	log := logger.FromContext(ctx)
+
+	log.Info("starting settings sync",
+		"org", cli.Org,
+		"repo", c.Repo,
+		"settings_file", c.SettingsFile,
+		"dry_run", cli.DryRun,
+	)
+
+	// Get GitHub token
+	token, err := github.GetToken(ctx, log, cli.UseGHAuth)
+	if err != nil {
+		return err
+	}
+
+	// Create GitHub client
+	client, err := github.NewClient(ctx, log, token)
+	if err != nil {
+		return err
+	}
+
+	// Parse sync config
+	syncConfig, err := config.ParseSyncConfigJSON(c.Config)
+	if err != nil {
+		return err
+	}
+
+	// Sync settings
+	if err := github.SyncSettings(
+		ctx,
+		log,
+		client,
+		cli.Org,
+		c.Repo,
+		c.SettingsFile,
+		syncConfig,
+		cli.DryRun,
+	); err != nil {
+		return err
+	}
+
+	log.Info("settings sync completed successfully")
+
+	return nil
+}
+
 // ReposCmd contains repository listing subcommands.
 type ReposCmd struct {
 	List ReposListCmd `cmd:"" help:"List organization repositories"`
@@ -417,79 +483,14 @@ type ConfigSchemaCmd struct{}
 
 // Run executes the config schema command.
 func (*ConfigSchemaCmd) Run(_ context.Context) error {
-	reflector := jsonschema.Reflector{
-		AllowAdditionalProperties:  false,
-		RequiredFromJSONSchemaTags: true,
-	}
-
-	schema := reflector.Reflect(&config.SyncConfig{})
-	schema.Version = "https://json-schema.org/draft/2020-12/schema"
-	schema.ID = "https://raw.githubusercontent.com/smykla-labs/.github/main/schemas/sync-config.schema.json"
-	schema.Title = "Sync Configuration"
-	schema.Description = "Configuration for organization-wide label, file, and smyklot version synchronization. Place at .github/sync-config.yml in your repository."
-
-	// Convert to JSON and back to map for post-processing
-	schemaBytes, err := json.Marshal(schema)
+	output, err := schema.GenerateSchema("github.com/smykla-labs/.github", "./pkg/config")
 	if err != nil {
-		return errors.Wrap(err, "marshaling schema to bytes")
-	}
-
-	var schemaMap map[string]any
-	if err = json.Unmarshal(schemaBytes, &schemaMap); err != nil {
-		return errors.Wrap(err, "unmarshaling schema to map")
-	}
-
-	// Add examples to specific fields
-	addExamples(schemaMap)
-
-	output, err := json.MarshalIndent(schemaMap, "", "  ")
-	if err != nil {
-		return errors.Wrap(err, "marshaling final schema")
+		return err
 	}
 
 	fmt.Println(string(output))
 
 	return nil
-}
-
-// addExamples adds examples to specific fields in the schema.
-func addExamples(schemaMap map[string]any) {
-	defs, ok := schemaMap["$defs"].(map[string]any)
-	if !ok {
-		return
-	}
-
-	// Add examples to LabelsConfig.exclude
-	addExcludeExamples(defs, "LabelsConfig", []any{
-		[]string{"ci/skip-tests", "ci/force-full"},
-		[]string{"release/major", "release/minor", "release/patch"},
-	})
-
-	// Add examples to FilesConfig.exclude
-	addExcludeExamples(defs, "FilesConfig", []any{
-		[]string{"CONTRIBUTING.md", "CODE_OF_CONDUCT.md"},
-		[]string{".github/PULL_REQUEST_TEMPLATE.md", "SECURITY.md"},
-	})
-}
-
-// addExcludeExamples adds examples to the exclude field of a config type.
-func addExcludeExamples(defs map[string]any, configName string, examples []any) {
-	configDef, ok := defs[configName].(map[string]any)
-	if !ok {
-		return
-	}
-
-	props, ok := configDef["properties"].(map[string]any)
-	if !ok {
-		return
-	}
-
-	exclude, ok := props["exclude"].(map[string]any)
-	if !ok {
-		return
-	}
-
-	exclude["examples"] = examples
 }
 
 // ConfigVerifyCmd verifies schema is in sync and commits if needed.
@@ -559,11 +560,7 @@ func main() {
 		kong.BindTo(appCtx, (*context.Context)(nil)),
 	)
 
-	log := logger.New(cli.LogLevel)
+	kongCtx.BindTo(logger.WithContext(appCtx, logger.New(cli.LogLevel)), (*context.Context)(nil))
 
-	appCtx = logger.WithContext(appCtx, log)
-	kongCtx.BindTo(appCtx, (*context.Context)(nil))
-
-	err := kongCtx.Run(&cli)
-	kongCtx.FatalIfErrorf(err)
+	kongCtx.FatalIfErrorf(kongCtx.Run(&cli))
 }

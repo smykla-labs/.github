@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"log/slog"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/cockroachdb/errors"
-	"github.com/google/go-github/v79/github"
+	"github.com/google/go-github/v80/github"
+
+	"github.com/smykla-labs/.github/pkg/schema"
 )
 
 // VerifyAndCommitSchema verifies schema is in sync and commits if needed.
@@ -37,9 +38,7 @@ func VerifyAndCommitSchema(
 	// Generate current schema
 	log.Info("generating schema")
 
-	cmd := exec.CommandContext(ctx, "./bin/dotsync", "config", "schema")
-
-	output, err := cmd.Output()
+	output, err := schema.GenerateSchema("github.com/smykla-labs/.github", "./pkg/config")
 	if err != nil {
 		return false, errors.Wrap(err, "generating schema")
 	}
@@ -138,8 +137,7 @@ func VerifyAndCommitSchema(
 	// Create commit
 	commitMessage := `chore(schema): regenerate sync-config schema
 
-Schema was out of sync with Go types. Regenerated using:
-./bin/dotsync config schema > schemas/sync-config.schema.json`
+Schema was out of sync with Go types. Regenerated from SyncConfig struct.`
 
 	newCommit := github.Commit{
 		Message: github.Ptr(commitMessage),
@@ -160,8 +158,7 @@ Schema was out of sync with Go types. Regenerated using:
 		Force: github.Ptr(false),
 	}
 
-	_, _, err = client.Git.UpdateRef(ctx, owner, name, "heads/"+branch, updateRef)
-	if err != nil {
+	if _, _, err := client.Git.UpdateRef(ctx, owner, name, "heads/"+branch, updateRef); err != nil {
 		return false, errors.Wrap(err, "updating ref")
 	}
 

@@ -6,7 +6,7 @@ require (
 	github.com/alecthomas/kong v1.13.0
 	github.com/cockroachdb/errors v1.12.0
 	github.com/gofri/go-github-ratelimit/v2 v2.0.2
-	github.com/google/go-github/v79 v79.0.0
+	github.com/google/go-github/v80 v80.0.0
 	github.com/invopop/jsonschema v0.13.0
 	golang.org/x/term v0.37.0
 	gopkg.in/yaml.v3 v3.0.1
