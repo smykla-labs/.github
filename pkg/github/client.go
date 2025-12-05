@@ -40,7 +40,7 @@ func NewClient(ctx context.Context, log *logger.Logger, token string) (*Client, 
 }
 
 func validateToken(ctx context.Context, client *github.Client) error {
-	_, resp, err := client.Users.Get(ctx, "")
+	_, resp, err := client.RateLimit.Get(ctx)
 	if err != nil {
 		return errors.Wrap(ErrValidatingToken, err.Error())
 	}
