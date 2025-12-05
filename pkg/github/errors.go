@@ -16,4 +16,11 @@ var (
 	ErrFileSync         = errors.New("failed to sync files")
 	ErrSmyklotSync      = errors.New("failed to sync smyklot version")
 	ErrSettingsSync     = errors.New("failed to sync repository settings")
+
+	// Merge operation errors
+	ErrMergeTypeMismatch = errors.New(
+		"merge type mismatch: org and repo file types incompatible",
+	)
+	ErrMergeParseError          = errors.New("failed to parse file for merge")
+	ErrMergeUnsupportedFileType = errors.New("merge only supports JSON and YAML files")
 )
