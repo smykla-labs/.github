@@ -10,6 +10,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/cockroachdb/errors"
+	_ "github.com/spf13/cobra" // Temporary: keeping dependency during migration
 
 	"github.com/smykla-labs/.github/pkg/config"
 	"github.com/smykla-labs/.github/pkg/github"
