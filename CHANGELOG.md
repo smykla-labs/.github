@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.0](https://github.com/smykla-labs/.github/compare/dotsync/v1.1.0...dotsync/v1.2.0) (2025-12-05)
+
+### Features
+
+* **actions:** unify dotsync actions ([#12](https://github.com/smykla-labs/.github/issues/12)) ([397f739](https://github.com/smykla-labs/.github/commit/397f739e1c202dd2865ae7cf5d2515acc0c9ec68))
+
 ## [1.1.0](https://github.com/smykla-labs/.github/compare/dotsync/v1.0.2...dotsync/v1.1.0) (2025-12-05)
 
 ### Features
