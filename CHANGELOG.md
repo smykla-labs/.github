@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.5](https://github.com/smykla-labs/.github/compare/dotsync/v1.4.4...dotsync/v1.4.5) (2025-12-06)
+
+### Bug Fixes
+
+* **settings:** remove invalid ruleset properties ([9467409](https://github.com/smykla-labs/.github/commit/94674096afde9b99f82032c1d22e1cf40a23fa2e))
+
 ## [1.4.4](https://github.com/smykla-labs/.github/compare/dotsync/v1.4.3...dotsync/v1.4.4) (2025-12-06)
 
 ### Bug Fixes
