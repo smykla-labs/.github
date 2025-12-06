@@ -39,6 +39,8 @@ func ParseSyncConfigJSON(jsonStr string) (*configtypes.SyncConfig, error) {
 }
 
 // GetMergeConfig returns the merge configuration for a specific file path, if configured.
+// Returns nil if no merge config exists for the path or if the config is nil.
+// Safe to call with nil config - Sync and Files are value types, Merge slice iteration is nil-safe.
 func GetMergeConfig(c *configtypes.SyncConfig, path string) *configtypes.FileMergeConfig {
 	if c == nil {
 		return nil

@@ -89,7 +89,7 @@
 #
 # sync.files.merge[].strategy (string, default: "deep-merge")
 #   Merge strategy to use:
-#   - "deep-merge": Recursively merge objects (repo overrides win at leaf level)
+#   - "deep-merge": Recursively merge objects (configured overrides win at leaf level)
 #   - "shallow-merge": Only merge top-level keys (nested objects replaced)
 #   - "overlay": Alias for "deep-merge"
 #
@@ -215,7 +215,9 @@ sync: {}
 #             push:
 #               branches: ["main", "develop"]
 
-# Example 12: Deep merge with nested overrides and removal
+# Example 12: Deep merge with field removal
+# NOTE: Arrays are REPLACED entirely per RFC 7396, not merged. If the org template
+# has packageRules, setting it here replaces the entire array.
 # sync:
 #   files:
 #     merge:
@@ -223,9 +225,7 @@ sync: {}
 #         strategy: "deep-merge"
 #         overrides:
 #           schedule: null  # Remove schedule from org template
-#           packageRules:
-#             - matchPackageNames: ["golang"]
-#               groupName: "Go Updates"
+#           rebaseWhen: "conflicted"  # Override single field
 
 # Example 13: Multiple files with different strategies
 # sync:

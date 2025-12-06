@@ -248,7 +248,7 @@ func processFileMapping(
 
 		// Apply merge
 		mergedContent, mergeErr := applyMerge(
-			log, sourceContent, targetContent, targetExists, mapping.Dest, mergeConfig,
+			log, sourceContent, mapping.Dest, mergeConfig,
 		)
 		if mergeErr != nil {
 			log.Warn("failed to apply merge, falling back to replacement",
@@ -397,12 +397,25 @@ func isExcluded(path string, exclude []string) bool {
 	return slices.Contains(exclude, path)
 }
 
+// filterOutMerged filters out files that appear in the merged map.
+// Used to prevent duplicate listings in PR body sections.
+func filterOutMerged(files []string, merged map[string]string) []string {
+	result := make([]string, 0, len(files))
+
+	for _, f := range files {
+		if _, isMerged := merged[f]; !isMerged {
+			result = append(result, f)
+		}
+	}
+
+	return result
+}
+
 // applyMerge applies merge configuration to file content.
+// It uses the org template (sourceContent) as base and applies configured overrides.
 func applyMerge(
 	log *logger.Logger,
 	sourceContent []byte,
-	targetContent []byte,
-	targetExists bool,
 	path string,
 	mergeConfig *configtypes.FileMergeConfig,
 ) ([]byte, error) {
@@ -436,31 +449,17 @@ func applyMerge(
 		)
 	}
 
-	// Parse source (org template)
+	// Parse source (org template) - always use as base to inherit org updates
 	sourceMap, err := parseFunc(sourceContent)
 	if err != nil {
 		return nil, errors.Wrapf(err, "parsing source file %s", path)
 	}
 
-	// Start with source as base
-	base := sourceMap
-
-	// If target exists in repo, use it as base instead
-	if targetExists {
-		var targetMap map[string]any
-
-		targetMap, err = parseFunc(targetContent)
-		if err != nil {
-			return nil, errors.Wrapf(err, "parsing target file %s", path)
-		}
-
-		base = targetMap
-	}
-
-	// Apply merge: base (repo or org) + overrides
+	// Apply merge: org template (base) + configured overrides
+	// This ensures repos always get org template updates while preserving their custom overrides
 	var result map[string]any
 
-	result, err = mergeFunc(base, mergeConfig.Overrides, mergeConfig.Strategy)
+	result, err = mergeFunc(sourceMap, mergeConfig.Overrides, mergeConfig.Strategy)
 	if err != nil {
 		return nil, errors.Wrapf(err, "merging file %s", path)
 	}
@@ -1011,30 +1010,32 @@ func buildPRBody(org string, sourceRepo string, stats *FileSyncStats) string {
 		org, sourceRepo, org, sourceRepo,
 	))
 
-	// Files created section
-	if len(stats.CreatedFiles) > 0 {
-		body.WriteString("\n## Files Created\n\n")
-
-		for _, file := range stats.CreatedFiles {
-			body.WriteString(fmt.Sprintf("- `%s`\n", file))
-		}
-	}
-
-	// Files updated section
-	if len(stats.UpdatedFiles) > 0 {
-		body.WriteString("\n## Files Updated\n\n")
-
-		for _, file := range stats.UpdatedFiles {
-			body.WriteString(fmt.Sprintf("- `%s`\n", file))
-		}
-	}
-
-	// Files merged section
+	// Files merged section (show first since these are customized)
 	if len(stats.MergedFiles) > 0 {
-		body.WriteString("\n## Files Merged with Repo Overrides\n\n")
+		body.WriteString("\n## Files Merged with Configured Overrides\n\n")
 
 		for file, strategy := range stats.MergedFiles {
 			body.WriteString(fmt.Sprintf("- `%s` (%s strategy)\n", file, strategy))
+		}
+	}
+
+	// Files created section (exclude merged files)
+	createdNonMerged := filterOutMerged(stats.CreatedFiles, stats.MergedFiles)
+	if len(createdNonMerged) > 0 {
+		body.WriteString("\n## Files Created\n\n")
+
+		for _, file := range createdNonMerged {
+			body.WriteString(fmt.Sprintf("- `%s`\n", file))
+		}
+	}
+
+	// Files updated section (exclude merged files)
+	updatedNonMerged := filterOutMerged(stats.UpdatedFiles, stats.MergedFiles)
+	if len(updatedNonMerged) > 0 {
+		body.WriteString("\n## Files Updated\n\n")
+
+		for _, file := range updatedNonMerged {
+			body.WriteString(fmt.Sprintf("- `%s`\n", file))
 		}
 	}
 

@@ -78,8 +78,8 @@ type FileMergeConfig struct {
 	// Merge strategy to use. deep-merge (default) recursively merges nested objects; shallow-merge
 	// only merges top-level keys
 	Strategy MergeStrategy `json:"strategy" jsonschema:"enum=deep-merge,enum=shallow-merge,enum=overlay,default=deep-merge" yaml:"strategy"`
-	// Key-value pairs to override in the merged result. Repo values take precedence over org
-	// defaults. Use null to explicitly remove a field
+	// Static override values to merge with the org template. These values take precedence over org
+	// defaults. Use null to explicitly remove a field from the result
 	Overrides map[string]any `json:"overrides" yaml:"overrides"`
 }
 
@@ -87,8 +87,8 @@ type FileMergeConfig struct {
 type MergeStrategy string
 
 const (
-	// MergeStrategyDeep recursively merges nested objects. Arrays are replaced, not merged. Repo
-	// values override org defaults at leaf level
+	// MergeStrategyDeep recursively merges nested objects. Arrays are replaced, not merged.
+	// Configured overrides take precedence over org defaults at leaf level
 	MergeStrategyDeep MergeStrategy = "deep-merge"
 	// MergeStrategyShallow merges only top-level keys. Nested objects are replaced if overridden,
 	// not merged recursively
