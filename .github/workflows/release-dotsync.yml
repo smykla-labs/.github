@@ -102,15 +102,25 @@ jobs:
           gh workflow disable sync-settings.yml --repo smykla-labs/.github
           echo "✅ Sync workflows disabled"
 
-  # Run tests
-  test:
+  # Run tests and linters in parallel
+  validate:
     needs: prepare
-    name: Test
+    name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     env:
       MISE_ENV: ci
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Test
+            command: task test
+          - name: Lint Go
+            command: task lint:go
+          - name: Lint Other
+            command: task lint:markdown lint:mod
     steps:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -120,53 +130,14 @@ jobs:
         with:
           cache: true
 
-      - name: Run tests
-        run: task test
-
-  # Run golangci-lint
-  lint-go:
-    needs: prepare
-    name: Lint Go
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
-        with:
-          version: latest
-
-  # Run other linters
-  lint-other:
-    needs: prepare
-    name: Lint Other
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    env:
-      MISE_ENV: ci
-    steps:
-      - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - name: Install mise
-        uses: jdx/mise-action@146a28175021df8ca24f8ee1828cc2a60f980bd5 # v3.5.1
-        with:
-          cache: true
-
-      - name: Run other linters
-        run: |
-          task lint:markdown
-          task lint:mod
+      - name: ${{ matrix.name }}
+        run: ${{ matrix.command }}
 
   # Determine if a release should be created
   release:
     name: Semantic Release
     runs-on: ubuntu-24.04
-    needs: [test, lint-go, lint-other]
+    needs: validate
     permissions:
       contents: write
       issues: write
