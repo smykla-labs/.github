@@ -303,13 +303,13 @@ func fetchSyncConfig(
 	}
 
 	// Otherwise, fetch from target repo
-	log.Debug("fetching sync config from target repo", "org", org, "repo", repo)
+	log.Info("fetching sync config from target repo", "org", org, "repo", repo)
 
 	syncConfigBytes, err := github.FetchSyncConfig(ctx, client, org, repo)
 	if err != nil {
 		// If file doesn't exist, return empty config (all syncs enabled by default)
 		if errors.Is(err, github.ErrFileNotFound) {
-			log.Debug("no sync-config.yml found in target repo, using defaults")
+			log.Info("no sync-config.yml found in target repo, using defaults")
 
 			return &configtypes.SyncConfig{}, nil
 		}
@@ -318,7 +318,17 @@ func fetchSyncConfig(
 	}
 
 	// Parse config (handles both YAML and JSON)
-	return config.ParseSyncConfig(syncConfigBytes)
+	syncConfig, parseErr := config.ParseSyncConfig(syncConfigBytes)
+	if parseErr != nil {
+		return nil, errors.Wrap(parseErr, "parsing sync config")
+	}
+
+	log.Info("sync config loaded",
+		"merge_configs", len(syncConfig.Sync.Files.Merge),
+		"file_excludes", len(syncConfig.Sync.Files.Exclude),
+	)
+
+	return syncConfig, nil
 }
 
 func createSyncCommand(
