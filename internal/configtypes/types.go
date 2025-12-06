@@ -117,6 +117,28 @@ type SettingsConfig struct {
 	Skip bool `json:"skip" jsonschema:"default=false" yaml:"skip"`
 	// Specific settings sections or fields to exclude from sync
 	Exclude []string `json:"exclude" jsonschema:"examples=branch_protection,examples=security.secret_scanning,minLength=1,uniqueItems=true" yaml:"exclude"`
+	// Settings sections to merge with repo-specific overrides instead of replacing. Allows
+	// customizing specific fields while inheriting org defaults
+	Merge []SettingsMergeConfig `json:"merge" yaml:"merge"`
+}
+
+// Configures merge behavior for specific settings sections, allowing repo-specific customization
+// of fields while inheriting org defaults. Use section names like "repository", "features",
+// "security" for top-level sections, or branch protection patterns and ruleset names for array
+// items
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
+type SettingsMergeConfig struct {
+	// Section identifier to merge. Use "repository", "features", or "security" for top-level
+	// sections. For branch protection rules, use the pattern (e.g., "main", "release/*"). For
+	// rulesets, use the ruleset name
+	Section string `json:"section" jsonschema:"minLength=1,required" yaml:"section"`
+	// Merge strategy to use. deep-merge (default) recursively merges nested objects; shallow-merge
+	// only merges top-level keys
+	Strategy MergeStrategy `json:"strategy" jsonschema:"enum=deep-merge,enum=shallow-merge,enum=overlay,default=deep-merge" yaml:"strategy"`
+	// Static override values to merge with the org settings. These values take precedence over org
+	// defaults. Use null to explicitly remove a field from the result
+	Overrides map[string]any `json:"overrides" jsonschema:"required" yaml:"overrides"`
 }
 
 // Configures merge strategies and branch cleanup behavior for pull requests

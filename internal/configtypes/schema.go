@@ -31,3 +31,16 @@ func (FileMergeConfig) JSONSchemaExtend(schema *jsonschema.Schema) {
 		}
 	}
 }
+
+// JSONSchemaExtend adds example values to the SettingsMergeConfig schema.
+func (SettingsMergeConfig) JSONSchemaExtend(schema *jsonschema.Schema) {
+	if sectionProp, ok := schema.Properties.Get("section"); ok {
+		sectionProp.Examples = []any{
+			"repository",
+			"features",
+			"security",
+			"main",
+			"release/*",
+		}
+	}
+}
