@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0](https://github.com/smykla-labs/.github/compare/dotsync/v1.3.1...dotsync/v1.4.0) (2025-12-06)
+
+### Features
+
+* **release:** add timeout to sync wait step ([617e86d](https://github.com/smykla-labs/.github/commit/617e86df297bca900ee37eea896e02d470cd07fe))
+* **release:** pin version and coordinate syncs ([6798f71](https://github.com/smykla-labs/.github/commit/6798f71cb7b1aea5862208c5a27a60dad69239f8))
+* **version:** add commit SHA and startup logging ([f06730f](https://github.com/smykla-labs/.github/commit/f06730fcdba455104e9acbb477221ce6bcc9f0ad))
+
+### Code Refactoring
+
+* **ci:** run tests and linters in parallel ([e841dcd](https://github.com/smykla-labs/.github/commit/e841dcd692ae62d17cae74b93c5a63c59cb65aa2))
+
 ## [1.3.1](https://github.com/smykla-labs/.github/compare/dotsync/v1.3.0...dotsync/v1.3.1) (2025-12-06)
 
 ### Bug Fixes
