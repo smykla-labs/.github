@@ -2,21 +2,17 @@
   "$defs": {
     "FileMergeConfig": {
       "additionalProperties": false,
-      "description": "Configures merge behavior for specific files, allowing repo-specific customization of fields while inheriting org defaults",
       "properties": {
         "overrides": {
-          "description": "Key-value pairs to override in the merged result. Repo values take precedence over org defaults. Use null to explicitly remove a field",
           "type": "object"
         },
         "path": {
-          "description": "File path (relative to repo root) to merge. Must be a JSON or YAML file",
           "minLength": 1,
           "pattern": "^[^/].*$",
           "type": "string"
         },
         "strategy": {
           "default": "deep-merge",
-          "description": "Merge strategy to use. deep-merge (default) recursively merges nested objects; shallow-merge only merges top-level keys",
           "enum": [
             "deep-merge",
             "shallow-merge",
@@ -32,15 +28,12 @@
     },
     "FilesConfig": {
       "additionalProperties": false,
-      "description": "Controls which organization template files (CODE_OF_CONDUCT.md, CONTRIBUTING.md, etc.) are synced to this repository, with options to exclude specific files or remove unmanaged files",
       "properties": {
         "allow_removal": {
           "default": false,
-          "description": "DANGEROUS: When true, files in this repo that are NOT in the central sync config will be DELETED. This can cause data loss. Strongly recommend keeping this false",
           "type": "boolean"
         },
         "exclude": {
-          "description": "File paths (relative to repo root) to exclude from sync. These files will NOT be created/updated in this repository. Existing files at these paths are preserved but not managed",
           "examples": [
             [
               "CONTRIBUTING.md",
@@ -60,7 +53,6 @@
           "uniqueItems": true
         },
         "merge": {
-          "description": "Files to merge with repo-specific overrides instead of replacing. Allows customizing specific fields while inheriting org defaults",
           "items": {
             "$ref": "#/$defs/FileMergeConfig"
           },
@@ -68,7 +60,6 @@
         },
         "skip": {
           "default": false,
-          "description": "Skip file synchronization only. Label sync still runs unless sync.skip or sync.labels.skip is true",
           "type": "boolean"
         }
       },
@@ -76,15 +67,12 @@
     },
     "LabelsConfig": {
       "additionalProperties": false,
-      "description": "Manages which GitHub labels are synced from central configuration, with options to exclude specific labels or remove labels not in the central config",
       "properties": {
         "allow_removal": {
           "default": false,
-          "description": "When true, labels in this repo that are NOT in the central config will be DELETED. Use with caution - this removes custom labels",
           "type": "boolean"
         },
         "exclude": {
-          "description": "Label names to exclude from synchronization. These labels will NOT be created/updated in this repository. Existing labels with these names are preserved but not managed",
           "examples": [
             [
               "ci/skip-tests",
@@ -105,7 +93,6 @@
         },
         "skip": {
           "default": false,
-          "description": "Skip label synchronization only. File sync still runs unless sync.skip or sync.files.skip is true",
           "type": "boolean"
         }
       },
@@ -113,10 +100,8 @@
     },
     "SettingsConfig": {
       "additionalProperties": false,
-      "description": "Controls synchronization of GitHub repository settings like merge strategies, branch protection, security features, and access controls",
       "properties": {
         "exclude": {
-          "description": "Specific settings sections or fields to exclude from sync",
           "items": {
             "minLength": 1,
             "type": "string"
@@ -126,7 +111,6 @@
         },
         "skip": {
           "default": false,
-          "description": "Skip repository settings synchronization. Other sync operations still run unless their respective skip flags are set",
           "type": "boolean"
         }
       },
@@ -134,11 +118,9 @@
     },
     "SmyklotConfig": {
       "additionalProperties": false,
-      "description": "Controls automatic updates of smyklot version references in workflow files when new versions are released",
       "properties": {
         "skip": {
           "default": false,
-          "description": "Skip smyklot version synchronization only. Label and file sync still run unless their respective skip flags are set. Use this for repos that don't use smyklot or manage their own versions",
           "type": "boolean"
         }
       },
@@ -146,39 +128,31 @@
     },
     "SyncConfig": {
       "additionalProperties": false,
-      "description": "Configuration for controlling organization-wide synchronization of labels, files, smyklot versions, and repository settings across all repositories",
       "properties": {
         "sync": {
-          "$ref": "#/$defs/SyncSettings",
-          "description": "Top-level sync configuration controlling label, file, and smyklot version synchronization behavior"
+          "$ref": "#/$defs/SyncSettings"
         }
       },
       "type": "object"
     },
     "SyncSettings": {
       "additionalProperties": false,
-      "description": "Centralized control for all synchronization operations including labels, files, smyklot versions, and repository settings",
       "properties": {
         "files": {
-          "$ref": "#/$defs/FilesConfig",
-          "description": "File synchronization configuration"
+          "$ref": "#/$defs/FilesConfig"
         },
         "labels": {
-          "$ref": "#/$defs/LabelsConfig",
-          "description": "Label synchronization configuration"
+          "$ref": "#/$defs/LabelsConfig"
         },
         "settings": {
-          "$ref": "#/$defs/SettingsConfig",
-          "description": "Repository settings synchronization configuration"
+          "$ref": "#/$defs/SettingsConfig"
         },
         "skip": {
           "default": false,
-          "description": "Skip ALL syncs for this repository. Equivalent to setting labels.skip, files.skip, smyklot.skip, and settings.skip to true",
           "type": "boolean"
         },
         "smyklot": {
-          "$ref": "#/$defs/SmyklotConfig",
-          "description": "Smyklot version synchronization configuration"
+          "$ref": "#/$defs/SmyklotConfig"
         }
       },
       "type": "object"
@@ -190,4 +164,3 @@
   "description": "Configuration for organization-wide label, file, and smyklot version synchronization. Place at .github/sync-config.yml in your repository.",
   "title": "Sync Configuration"
 }
-

@@ -39,7 +39,7 @@ func ParseSyncConfigJSON(jsonStr string) (*configtypes.SyncConfig, error) {
 }
 
 // GetMergeConfig returns the merge configuration for a specific file path, if configured.
-func (c *SyncConfig) GetMergeConfig(path string) *FileMergeConfig {
+func GetMergeConfig(c *configtypes.SyncConfig, path string) *configtypes.FileMergeConfig {
 	if c == nil {
 		return nil
 	}

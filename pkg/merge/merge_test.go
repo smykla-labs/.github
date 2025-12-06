@@ -3,7 +3,7 @@ package merge_test
 import (
 	"testing"
 
-	"github.com/smykla-labs/.github/pkg/config"
+	"github.com/smykla-labs/.github/internal/configtypes"
 	"github.com/smykla-labs/.github/pkg/merge"
 )
 
@@ -300,13 +300,13 @@ func TestMergeJSON(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		strategy config.MergeStrategy
+		strategy configtypes.MergeStrategy
 		want     map[string]any
 		wantErr  bool
 	}{
 		{
 			name:     "deep merge strategy",
-			strategy: config.MergeStrategyDeep,
+			strategy: configtypes.MergeStrategyDeep,
 			want: map[string]any{
 				"name": "org",
 				"config": map[string]any{
@@ -317,7 +317,7 @@ func TestMergeJSON(t *testing.T) {
 		},
 		{
 			name:     "overlay strategy alias",
-			strategy: config.MergeStrategyOverlay,
+			strategy: configtypes.MergeStrategyOverlay,
 			want: map[string]any{
 				"name": "org",
 				"config": map[string]any{
@@ -328,7 +328,7 @@ func TestMergeJSON(t *testing.T) {
 		},
 		{
 			name:     "shallow merge strategy",
-			strategy: config.MergeStrategyShallow,
+			strategy: configtypes.MergeStrategyShallow,
 			want: map[string]any{
 				"name": "org",
 				"config": map[string]any{
@@ -338,7 +338,7 @@ func TestMergeJSON(t *testing.T) {
 		},
 		{
 			name:     "unknown strategy",
-			strategy: config.MergeStrategy("invalid"),
+			strategy: configtypes.MergeStrategy("invalid"),
 			wantErr:  true,
 		},
 	}
@@ -372,7 +372,7 @@ func TestMergeYAML(t *testing.T) {
 		"age": 30,
 	}
 
-	got, err := merge.MergeYAML(base, override, config.MergeStrategyDeep)
+	got, err := merge.MergeYAML(base, override, configtypes.MergeStrategyDeep)
 	if err != nil {
 		t.Fatalf("MergeYAML() error = %v", err)
 	}
@@ -1041,7 +1041,7 @@ func TestMergeJSON_RealWorldRenovateExample(t *testing.T) {
 		"automerge":  true,
 	}
 
-	result, err := merge.MergeJSON(orgTemplate, repoOverride, config.MergeStrategyDeep)
+	result, err := merge.MergeJSON(orgTemplate, repoOverride, configtypes.MergeStrategyDeep)
 	if err != nil {
 		t.Fatalf("MergeJSON() error = %v", err)
 	}
@@ -1096,7 +1096,7 @@ func TestMergeYAML_RealWorldGitHubActionsExample(t *testing.T) {
 		},
 	}
 
-	result, err := merge.MergeYAML(orgTemplate, repoOverride, config.MergeStrategyDeep)
+	result, err := merge.MergeYAML(orgTemplate, repoOverride, configtypes.MergeStrategyDeep)
 	if err != nil {
 		t.Fatalf("MergeYAML() error = %v", err)
 	}
@@ -1139,28 +1139,28 @@ func TestMergeJSON_NilHandling(t *testing.T) {
 		name     string
 		base     map[string]any
 		override map[string]any
-		strategy config.MergeStrategy
+		strategy configtypes.MergeStrategy
 		wantErr  bool
 	}{
 		{
 			name:     "nil base and nil override",
 			base:     nil,
 			override: nil,
-			strategy: config.MergeStrategyDeep,
+			strategy: configtypes.MergeStrategyDeep,
 			wantErr:  false,
 		},
 		{
 			name:     "nil base with valid override",
 			base:     nil,
 			override: map[string]any{"key": "value"},
-			strategy: config.MergeStrategyShallow,
+			strategy: configtypes.MergeStrategyShallow,
 			wantErr:  false,
 		},
 		{
 			name:     "valid base with nil override",
 			base:     map[string]any{"key": "value"},
 			override: nil,
-			strategy: config.MergeStrategyDeep,
+			strategy: configtypes.MergeStrategyDeep,
 			wantErr:  false,
 		},
 	}
@@ -1237,12 +1237,12 @@ func TestMergeStrategies_Equivalence(t *testing.T) {
 	}
 
 	// Test that overlay and deep-merge are equivalent
-	deepResult, err := merge.MergeJSON(base, override, config.MergeStrategyDeep)
+	deepResult, err := merge.MergeJSON(base, override, configtypes.MergeStrategyDeep)
 	if err != nil {
 		t.Fatalf("DeepMerge error = %v", err)
 	}
 
-	overlayResult, err := merge.MergeJSON(base, override, config.MergeStrategyOverlay)
+	overlayResult, err := merge.MergeJSON(base, override, configtypes.MergeStrategyOverlay)
 	if err != nil {
 		t.Fatalf("Overlay error = %v", err)
 	}
@@ -1252,7 +1252,7 @@ func TestMergeStrategies_Equivalence(t *testing.T) {
 	}
 
 	// Test that shallow-merge produces different result
-	shallowResult, err := merge.MergeJSON(base, override, config.MergeStrategyShallow)
+	shallowResult, err := merge.MergeJSON(base, override, configtypes.MergeStrategyShallow)
 	if err != nil {
 		t.Fatalf("ShallowMerge error = %v", err)
 	}

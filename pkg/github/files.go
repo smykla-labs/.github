@@ -13,6 +13,7 @@ import (
 	"github.com/google/go-github/v80/github"
 
 	"github.com/smykla-labs/.github/internal/configtypes"
+	"github.com/smykla-labs/.github/pkg/config"
 	"github.com/smykla-labs/.github/pkg/logger"
 	"github.com/smykla-labs/.github/pkg/merge"
 )
@@ -234,9 +235,9 @@ func processFileMapping(
 	}
 
 	// Check for merge configuration
-	mergeConfig := syncConfig.GetMergeConfig(mapping.Dest)
+	mergeConfig := config.GetMergeConfig(syncConfig, mapping.Dest)
 
-	var mergeStrategy config.MergeStrategy
+	var mergeStrategy configtypes.MergeStrategy
 
 	if mergeConfig != nil {
 		log.Debug(
@@ -288,7 +289,7 @@ func processExistingFile(
 	mapping FileMapping,
 	sourceContent []byte,
 	targetContent []byte,
-	mergeStrategy config.MergeStrategy,
+	mergeStrategy configtypes.MergeStrategy,
 	stats *FileSyncStats,
 	changes []FileChange,
 ) []FileChange {
@@ -329,7 +330,7 @@ func processNewFile(
 	log *logger.Logger,
 	mapping FileMapping,
 	sourceContent []byte,
-	mergeStrategy config.MergeStrategy,
+	mergeStrategy configtypes.MergeStrategy,
 	stats *FileSyncStats,
 	changes []FileChange,
 ) []FileChange {
@@ -403,7 +404,7 @@ func applyMerge(
 	targetContent []byte,
 	targetExists bool,
 	path string,
-	mergeConfig *config.FileMergeConfig,
+	mergeConfig *configtypes.FileMergeConfig,
 ) ([]byte, error) {
 	// Detect file type based on extension
 	ext := filepath.Ext(path)
@@ -411,7 +412,7 @@ func applyMerge(
 	var (
 		parseFunc   func([]byte) (map[string]any, error)
 		marshalFunc func(map[string]any) ([]byte, error)
-		mergeFunc   func(map[string]any, map[string]any, config.MergeStrategy) (map[string]any, error)
+		mergeFunc   func(map[string]any, map[string]any, configtypes.MergeStrategy) (map[string]any, error)
 		isJSON      bool
 	)
 

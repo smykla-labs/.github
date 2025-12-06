@@ -9,7 +9,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"gopkg.in/yaml.v3"
 
-	"github.com/smykla-labs/.github/pkg/config"
+	"github.com/smykla-labs/.github/internal/configtypes"
 )
 
 // DeepMerge recursively merges two maps using RFC 7396 JSON Merge Patch semantics.
@@ -106,12 +106,12 @@ func ShallowMerge(base, override map[string]any) (map[string]any, error) {
 // MergeJSON merges two JSON objects using the specified strategy.
 func MergeJSON(
 	base, override map[string]any,
-	strategy config.MergeStrategy,
+	strategy configtypes.MergeStrategy,
 ) (map[string]any, error) {
 	switch strategy {
-	case config.MergeStrategyDeep, config.MergeStrategyOverlay:
+	case configtypes.MergeStrategyDeep, configtypes.MergeStrategyOverlay:
 		return DeepMerge(base, override)
-	case config.MergeStrategyShallow:
+	case configtypes.MergeStrategyShallow:
 		return ShallowMerge(base, override)
 	default:
 		return nil, errors.Wrapf(
@@ -126,7 +126,7 @@ func MergeJSON(
 // YAML is converted to JSON internally, merged, then converted back.
 func MergeYAML(
 	base, override map[string]any,
-	strategy config.MergeStrategy,
+	strategy configtypes.MergeStrategy,
 ) (map[string]any, error) {
 	// YAML and JSON have compatible data models, so we can use the same merge logic
 	return MergeJSON(base, override, strategy)
