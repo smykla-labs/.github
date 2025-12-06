@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.0](https://github.com/smykla-labs/.github/compare/dotsync/v1.2.2...dotsync/v1.3.0) (2025-12-06)
+
+### Features
+
+* **files:** add merge support for file sync ([#16](https://github.com/smykla-labs/.github/issues/16)) ([b91d3b8](https://github.com/smykla-labs/.github/commit/b91d3b809a963f0f31fd726db78f1c87951b0efa))
+* **settings:** add GitHub Rulesets sync support ([#15](https://github.com/smykla-labs/.github/issues/15)) ([aa8fa08](https://github.com/smykla-labs/.github/commit/aa8fa08baf498e18461b23c2645f4c8fe7ac2f43))
+
+### Code Refactoring
+
+* **schema:** extract schemagen to go run ([f4aaa80](https://github.com/smykla-labs/.github/commit/f4aaa80181c845b928ab7895f49af69246b309f1))
+* **schema:** use JSONSchemaExtend methods ([11ecb93](https://github.com/smykla-labs/.github/commit/11ecb93e8ab03f38f4f0665e9043f211470b46f9))
+
 ## [1.2.2](https://github.com/smykla-labs/.github/compare/dotsync/v1.2.1...dotsync/v1.2.2) (2025-12-05)
 
 ### Bug Fixes
