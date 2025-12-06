@@ -51,13 +51,7 @@ snapshot:
   version_template: "{{ incpatch (trimprefix .Tag \"dotsync/v\") }}-snapshot"
 
 changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
-      - "^chore:"
-      - "^ci:"
+  disable: true # semantic-release handles changelog generation
 
 dockers_v2:
   - ids:
@@ -87,12 +81,10 @@ release:
     name: .github
   draft: false
   prerelease: auto
-  mode: replace
+  mode: append
   header: |
-    ## dotsync {{ trimprefix .Tag "dotsync/v" }}
+    ---
 
-    Container images available at:
-    - `ghcr.io/smykla-labs/dotsync:{{ trimprefix .Tag "dotsync/v" }}`
-    - `ghcr.io/smykla-labs/dotsync:{{ index (split (trimprefix .Tag "dotsync/v") ".") 0 }}`
+    ## Container Images
+
     - `ghcr.io/smykla-labs/dotsync:{{ index (split (trimprefix .Tag "dotsync/v") ".") 0 }}.{{ index (split (trimprefix .Tag "dotsync/v") ".") 1 }}`
-    - `ghcr.io/smykla-labs/dotsync:latest`
