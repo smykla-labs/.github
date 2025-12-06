@@ -71,6 +71,7 @@ settings:
         ref_name:
           include:
             - "refs/heads/main"
+          exclude: []
       bypass_actors:
         # Organization admins can always bypass (for emergency fixes)
         - actor_id: 5                                    # OrganizationAdmin role ID
@@ -88,40 +89,18 @@ settings:
           require_code_owner_review: true
           require_last_push_approval: true
           required_review_thread_resolution: true
-          required_reviewers:
-            # Require review from specific teams/users based on file patterns
-            # NOTE: Customize per-repo in sync-config.yml or disable if not needed
-            - file_patterns: ["*"]
-              minimum_approvals: 1
-              reviewer:
-                id: 15113933                             # smykla-labs/maintainers team ID
-                type: "Team"
           allowed_merge_methods:
             - "squash"
         # Required status checks
         required_status_checks:
           strict_required_status_checks_policy: true
-          do_not_enforce_on_create: false
           required_status_checks: []                     # Empty = inherit repo's existing checks
-          # Example of explicit checks (uncomment and customize per-repo):
-          # - context: "Test"
-          #   integration_id: 15368                      # GitHub Actions
-          # - context: "Lint"
-          #   integration_id: 15368
-          # - context: "Build (darwin, amd64)"
-          #   integration_id: 15368
         # Prevent destructive operations
         deletion: true
         non_fast_forward: true
         # Require commit quality standards
         required_linear_history: true
         required_signatures: true
-        # Copilot code review analysis tools
-        copilot_code_review_analysis_tools:
-          tools:
-            - name: "CodeQL"
-            - name: "ESLint"
-            - name: "PMD"
         # Code scanning requirements
         code_scanning:
           code_scanning_tools:
