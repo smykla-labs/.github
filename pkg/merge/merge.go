@@ -8,9 +8,15 @@ import (
 
 	"github.com/cockroachdb/errors"
 	jsonpatch "github.com/evanphx/json-patch/v5"
+	"github.com/tidwall/pretty"
 	"gopkg.in/yaml.v3"
 
 	"github.com/smykla-labs/.github/internal/configtypes"
+)
+
+const (
+	// jsonPrettyWidth is the max column width for single-line arrays in JSON output.
+	jsonPrettyWidth = 80
 )
 
 // DeepMerge recursively merges two maps using RFC 7396 JSON Merge Patch semantics.
@@ -160,19 +166,28 @@ func ParseYAML(data []byte) (map[string]any, error) {
 
 // MarshalJSON converts a map to indented JSON bytes for readable config files.
 // Uses SetEscapeHTML(false) to preserve <, >, & characters in regex patterns.
+// Uses tidwall/pretty to keep short arrays on single lines.
 func MarshalJSON(data map[string]any) ([]byte, error) {
 	var buf bytes.Buffer
 
 	encoder := json.NewEncoder(&buf)
 	encoder.SetEscapeHTML(false)
-	encoder.SetIndent("", "  ")
 
 	if err := encoder.Encode(data); err != nil {
 		return nil, errors.Wrap(ErrMergeParseError, "marshaling to JSON")
 	}
 
-	// Encode adds trailing newline, trim for consistency with MarshalIndent
-	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
+	// Use tidwall/pretty for formatting with compact short arrays
+	opts := &pretty.Options{
+		Width:    jsonPrettyWidth,
+		Indent:   "  ",
+		SortKeys: true,
+	}
+
+	result := pretty.PrettyOptions(buf.Bytes(), opts)
+
+	// Trim trailing newline for consistency
+	return bytes.TrimSuffix(result, []byte("\n")), nil
 }
 
 // MarshalYAML converts a map to YAML bytes.
