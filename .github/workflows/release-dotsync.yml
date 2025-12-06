@@ -49,9 +49,61 @@ jobs:
       - name: Conditions met
         run: echo "Workflow conditions met, proceeding with release process"
 
+  # Wait for sync workflows and disable them
+  prepare:
+    needs: check
+    name: Prepare for Release
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Generate App Token
+        id: app-token
+        uses: actions/create-github-app-token@7e473efe3cb98aa54f8d4bac15400b15fad77d94 # v2.2.0
+        with:
+          app-id: ${{ vars.SMYKLOT_APP_ID }}
+          private-key: ${{ secrets.SMYKLOT_APP_PRIVATE_KEY }}
+
+      - name: Wait for sync workflows to complete
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          echo "Checking for running sync workflows..."
+
+          while true; do
+            # Get all running workflow runs for sync workflows
+            running_syncs=$(gh run list \
+              --repo smykla-labs/.github \
+              --workflow sync-labels.yml \
+              --workflow sync-files.yml \
+              --workflow sync-settings.yml \
+              --status in_progress \
+              --json databaseId \
+              --jq 'length')
+
+            if [ "$running_syncs" -eq 0 ]; then
+              echo "✅ No sync workflows running"
+              break
+            fi
+
+            echo "⏳ Waiting for $running_syncs sync workflow(s) to complete..."
+            sleep 30
+          done
+
+      - name: Disable sync workflows
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          echo "Disabling sync workflows..."
+          gh workflow disable sync-labels.yml --repo smykla-labs/.github
+          gh workflow disable sync-files.yml --repo smykla-labs/.github
+          gh workflow disable sync-settings.yml --repo smykla-labs/.github
+          echo "✅ Sync workflows disabled"
+
   # Run tests first
   test:
-    needs: check
+    needs: prepare
     name: Test
     runs-on: ubuntu-24.04
     permissions:
@@ -167,3 +219,40 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_CURRENT_TAG: ${{ needs.release.outputs.new_release_git_tag }}
+
+  # Re-enable sync workflows
+  # Only re-enable if:
+  # - prepare succeeded (workflows were disabled)
+  # - AND either:
+  #   - No release was published (failed before semantic-release)
+  #   - OR release was published AND goreleaser succeeded (complete release)
+  # Don't re-enable if release was published but goreleaser failed (needs manual intervention)
+  cleanup:
+    name: Re-enable Sync Workflows
+    runs-on: ubuntu-24.04
+    needs: [prepare, release, goreleaser]
+    if: |
+      always() &&
+      needs.prepare.result == 'success' &&
+      (needs.release.outputs.new_release_published != 'true' ||
+       needs.goreleaser.result == 'success')
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Generate App Token
+        id: app-token
+        uses: actions/create-github-app-token@7e473efe3cb98aa54f8d4bac15400b15fad77d94 # v2.2.0
+        with:
+          app-id: ${{ vars.SMYKLOT_APP_ID }}
+          private-key: ${{ secrets.SMYKLOT_APP_PRIVATE_KEY }}
+
+      - name: Re-enable sync workflows
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          echo "Re-enabling sync workflows..."
+          gh workflow enable sync-labels.yml --repo smykla-labs/.github
+          gh workflow enable sync-files.yml --repo smykla-labs/.github
+          gh workflow enable sync-settings.yml --repo smykla-labs/.github
+          echo "✅ Sync workflows re-enabled"
