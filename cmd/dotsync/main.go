@@ -18,7 +18,10 @@ import (
 	"github.com/smykla-labs/.github/pkg/logger"
 )
 
-var version = "dev"
+var (
+	version = "dev"
+	commit  = "unknown"
+)
 
 // FileMapping represents a source to destination file mapping.
 type FileMapping struct {
@@ -152,6 +155,11 @@ settings, and smyklot version references.`,
 		// Initialize logger
 		log := logger.New(logLevel)
 
+		// Log version info (skip for version command to keep output clean)
+		if cmd.Name() != "version" {
+			log.Info("dotsync starting", "version", version, "commit", commit)
+		}
+
 		// Inject logger into context
 		ctx := logger.WithContext(cmd.Context(), log)
 		cmd.SetContext(ctx)
@@ -167,7 +175,7 @@ var versionCmd = &cobra.Command{
 	Short: "Show version information",
 	Long:  "Display the current version of dotsync",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		fmt.Printf("dotsync version %s\n", version)
+		fmt.Printf("dotsync version %s (commit: %s)\n", version, commit)
 		return nil
 	},
 }

@@ -27,6 +27,7 @@ builds:
       - -s
       - -w
       - -X main.version={{ trimprefix .Tag "dotsync/v" }}
+      - -X main.commit={{ .FullCommit }}
 
 archives:
   - id: dotsync
