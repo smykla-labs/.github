@@ -80,7 +80,7 @@ type FileMergeConfig struct {
 	Strategy MergeStrategy `json:"strategy" jsonschema:"enum=deep-merge,enum=shallow-merge,enum=overlay,default=deep-merge" yaml:"strategy"`
 	// Static override values to merge with the org template. These values take precedence over org
 	// defaults. Use null to explicitly remove a field from the result
-	Overrides map[string]any `json:"overrides" yaml:"overrides"`
+	Overrides map[string]any `json:"overrides" jsonschema:"required" yaml:"overrides"`
 }
 
 // MergeStrategy defines how organization and repository file contents are merged

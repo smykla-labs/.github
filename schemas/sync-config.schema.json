@@ -22,7 +22,8 @@
         }
       },
       "required": [
-        "path"
+        "path",
+        "overrides"
       ],
       "type": "object"
     },

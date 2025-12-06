@@ -108,6 +108,11 @@ func MergeJSON(
 	base, override map[string]any,
 	strategy configtypes.MergeStrategy,
 ) (map[string]any, error) {
+	// Default to deep-merge if strategy is empty (not specified in config)
+	if strategy == "" {
+		strategy = configtypes.MergeStrategyDeep
+	}
+
 	switch strategy {
 	case configtypes.MergeStrategyDeep, configtypes.MergeStrategyOverlay:
 		return DeepMerge(base, override)
@@ -152,9 +157,9 @@ func ParseYAML(data []byte) (map[string]any, error) {
 	return result, nil
 }
 
-// MarshalJSON converts a map to JSON bytes.
+// MarshalJSON converts a map to indented JSON bytes for readable config files.
 func MarshalJSON(data map[string]any) ([]byte, error) {
-	result, err := json.Marshal(data)
+	result, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return nil, errors.Wrap(ErrMergeParseError, "marshaling to JSON")
 	}

@@ -1014,7 +1014,16 @@ func buildPRBody(org string, sourceRepo string, stats *FileSyncStats) string {
 	if len(stats.MergedFiles) > 0 {
 		body.WriteString("\n## Files Merged with Configured Overrides\n\n")
 
-		for file, strategy := range stats.MergedFiles {
+		// Sort files for deterministic output
+		mergedPaths := make([]string, 0, len(stats.MergedFiles))
+		for file := range stats.MergedFiles {
+			mergedPaths = append(mergedPaths, file)
+		}
+
+		slices.Sort(mergedPaths)
+
+		for _, file := range mergedPaths {
+			strategy := stats.MergedFiles[file]
 			body.WriteString(fmt.Sprintf("- `%s` (%s strategy)\n", file, strategy))
 		}
 	}
