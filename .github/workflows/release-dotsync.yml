@@ -66,6 +66,7 @@ jobs:
           private-key: ${{ secrets.SMYKLOT_APP_PRIVATE_KEY }}
 
       - name: Wait for sync workflows to complete
+        timeout-minutes: 5
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
