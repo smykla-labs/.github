@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -12,7 +13,9 @@ import (
 	"github.com/google/go-github/v80/github"
 
 	"github.com/smykla-labs/.github/internal/configtypes"
+	"github.com/smykla-labs/.github/pkg/config"
 	"github.com/smykla-labs/.github/pkg/logger"
+	"github.com/smykla-labs/.github/pkg/merge"
 )
 
 const (
@@ -45,6 +48,7 @@ type FileSyncStats struct {
 	CreatedFiles     []string
 	UpdatedFiles     []string
 	DeletedFiles     []string
+	MergedFiles      map[string]string // path -> strategy
 }
 
 // SyncFiles synchronizes files from a central repo to a target repository.
@@ -89,7 +93,9 @@ func SyncFiles(
 	}
 
 	// Process files
-	stats := &FileSyncStats{}
+	stats := &FileSyncStats{
+		MergedFiles: make(map[string]string),
+	}
 
 	var changes []FileChange
 
@@ -228,13 +234,49 @@ func processFileMapping(
 		return changes
 	}
 
+	// Check for merge configuration
+	mergeConfig := config.GetMergeConfig(syncConfig, mapping.Dest)
+
+	var mergeStrategy configtypes.MergeStrategy
+
+	if mergeConfig != nil {
+		log.Debug(
+			"found merge config for file",
+			"file", mapping.Dest,
+			"strategy", mergeConfig.Strategy,
+		)
+
+		// Apply merge
+		mergedContent, mergeErr := applyMerge(
+			log, sourceContent, mapping.Dest, mergeConfig,
+		)
+		if mergeErr != nil {
+			log.Warn("failed to apply merge, falling back to replacement",
+				"file", mapping.Dest, "error", mergeErr)
+		} else {
+			// Use merged content
+			sourceContent = mergedContent
+			mergeStrategy = mergeConfig.Strategy
+		}
+	}
+
 	if targetExists {
 		return processExistingFile(
-			ctx, log, client, org, repo, mapping, sourceContent, targetContent, stats, changes,
+			ctx,
+			log,
+			client,
+			org,
+			repo,
+			mapping,
+			sourceContent,
+			targetContent,
+			mergeStrategy,
+			stats,
+			changes,
 		)
 	}
 
-	return processNewFile(log, mapping, sourceContent, stats, changes)
+	return processNewFile(log, mapping, sourceContent, mergeStrategy, stats, changes)
 }
 
 // processExistingFile handles updates to existing files.
@@ -247,6 +289,7 @@ func processExistingFile(
 	mapping FileMapping,
 	sourceContent []byte,
 	targetContent []byte,
+	mergeStrategy configtypes.MergeStrategy,
 	stats *FileSyncStats,
 	changes []FileChange,
 ) []FileChange {
@@ -259,8 +302,8 @@ func processExistingFile(
 		return changes
 	}
 
-	// Special case: renovate.json - check for manual modifications
-	if mapping.Dest == "renovate.json" {
+	// Special case: renovate.json - check for manual modifications (only if not merged)
+	if mapping.Dest == "renovate.json" && mergeStrategy == "" {
 		if shouldSkipRenovateJSON(ctx, log, client, org, repo, mapping.Dest, stats) {
 			return changes
 		}
@@ -270,6 +313,10 @@ func processExistingFile(
 
 	stats.Updated++
 	stats.UpdatedFiles = append(stats.UpdatedFiles, mapping.Dest)
+
+	if mergeStrategy != "" {
+		stats.MergedFiles[mapping.Dest] = string(mergeStrategy)
+	}
 
 	return append(changes, FileChange{
 		Path:    mapping.Dest,
@@ -283,6 +330,7 @@ func processNewFile(
 	log *logger.Logger,
 	mapping FileMapping,
 	sourceContent []byte,
+	mergeStrategy configtypes.MergeStrategy,
 	stats *FileSyncStats,
 	changes []FileChange,
 ) []FileChange {
@@ -290,6 +338,10 @@ func processNewFile(
 
 	stats.Created++
 	stats.CreatedFiles = append(stats.CreatedFiles, mapping.Dest)
+
+	if mergeStrategy != "" {
+		stats.MergedFiles[mapping.Dest] = string(mergeStrategy)
+	}
 
 	return append(changes, FileChange{
 		Path:    mapping.Dest,
@@ -343,6 +395,91 @@ func parseFilesConfig(filesConfig string) ([]FileMapping, error) {
 // isExcluded checks if a file is in the exclusion list.
 func isExcluded(path string, exclude []string) bool {
 	return slices.Contains(exclude, path)
+}
+
+// filterOutMerged filters out files that appear in the merged map.
+// Used to prevent duplicate listings in PR body sections.
+func filterOutMerged(files []string, merged map[string]string) []string {
+	result := make([]string, 0, len(files))
+
+	for _, f := range files {
+		if _, isMerged := merged[f]; !isMerged {
+			result = append(result, f)
+		}
+	}
+
+	return result
+}
+
+// applyMerge applies merge configuration to file content.
+// It uses the org template (sourceContent) as base and applies configured overrides.
+func applyMerge(
+	log *logger.Logger,
+	sourceContent []byte,
+	path string,
+	mergeConfig *configtypes.FileMergeConfig,
+) ([]byte, error) {
+	// Detect file type based on extension
+	ext := filepath.Ext(path)
+
+	var (
+		parseFunc   func([]byte) (map[string]any, error)
+		marshalFunc func(map[string]any) ([]byte, error)
+		mergeFunc   func(map[string]any, map[string]any, configtypes.MergeStrategy) (map[string]any, error)
+		isJSON      bool
+	)
+
+	switch strings.ToLower(ext) {
+	case ".json":
+		parseFunc = merge.ParseJSON
+		marshalFunc = merge.MarshalJSON
+		mergeFunc = merge.MergeJSON
+		isJSON = true
+	case ".yml", ".yaml":
+		parseFunc = merge.ParseYAML
+		marshalFunc = merge.MarshalYAML
+		mergeFunc = merge.MergeYAML
+		isJSON = false
+	default:
+		return nil, errors.Wrapf(
+			merge.ErrMergeUnsupportedFileType,
+			"file: %s, extension: %s",
+			path,
+			ext,
+		)
+	}
+
+	// Parse source (org template) - always use as base to inherit org updates
+	sourceMap, err := parseFunc(sourceContent)
+	if err != nil {
+		return nil, errors.Wrapf(err, "parsing source file %s", path)
+	}
+
+	// Apply merge: org template (base) + configured overrides
+	// This ensures repos always get org template updates while preserving their custom overrides
+	var result map[string]any
+
+	result, err = mergeFunc(sourceMap, mergeConfig.Overrides, mergeConfig.Strategy)
+	if err != nil {
+		return nil, errors.Wrapf(err, "merging file %s", path)
+	}
+
+	// Marshal back to bytes
+	var mergedContent []byte
+
+	mergedContent, err = marshalFunc(result)
+	if err != nil {
+		return nil, errors.Wrapf(err, "marshaling merged file %s", path)
+	}
+
+	// For JSON, add newline at end for better git diffs
+	if isJSON {
+		mergedContent = append(mergedContent, '\n')
+	}
+
+	log.Debug("applied merge", "file", path, "strategy", mergeConfig.Strategy)
+
+	return mergedContent, nil
 }
 
 // fetchFileContent fetches file content from a repository.
@@ -873,20 +1010,40 @@ func buildPRBody(org string, sourceRepo string, stats *FileSyncStats) string {
 		org, sourceRepo, org, sourceRepo,
 	))
 
-	// Files created section
-	if len(stats.CreatedFiles) > 0 {
+	// Files merged section (show first since these are customized)
+	if len(stats.MergedFiles) > 0 {
+		body.WriteString("\n## Files Merged with Configured Overrides\n\n")
+
+		// Sort files for deterministic output
+		mergedPaths := make([]string, 0, len(stats.MergedFiles))
+		for file := range stats.MergedFiles {
+			mergedPaths = append(mergedPaths, file)
+		}
+
+		slices.Sort(mergedPaths)
+
+		for _, file := range mergedPaths {
+			strategy := stats.MergedFiles[file]
+			body.WriteString(fmt.Sprintf("- `%s` (%s strategy)\n", file, strategy))
+		}
+	}
+
+	// Files created section (exclude merged files)
+	createdNonMerged := filterOutMerged(stats.CreatedFiles, stats.MergedFiles)
+	if len(createdNonMerged) > 0 {
 		body.WriteString("\n## Files Created\n\n")
 
-		for _, file := range stats.CreatedFiles {
+		for _, file := range createdNonMerged {
 			body.WriteString(fmt.Sprintf("- `%s`\n", file))
 		}
 	}
 
-	// Files updated section
-	if len(stats.UpdatedFiles) > 0 {
+	// Files updated section (exclude merged files)
+	updatedNonMerged := filterOutMerged(stats.UpdatedFiles, stats.MergedFiles)
+	if len(updatedNonMerged) > 0 {
 		body.WriteString("\n## Files Updated\n\n")
 
-		for _, file := range stats.UpdatedFiles {
+		for _, file := range updatedNonMerged {
 			body.WriteString(fmt.Sprintf("- `%s`\n", file))
 		}
 	}

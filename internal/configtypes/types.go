@@ -63,7 +63,39 @@ type FilesConfig struct {
 	// DANGEROUS: When true, files in this repo that are NOT in the central sync config will be
 	// DELETED. This can cause data loss. Strongly recommend keeping this false
 	AllowRemoval bool `json:"allow_removal" jsonschema:"default=false" yaml:"allow_removal"`
+	// Files to merge with repo-specific overrides instead of replacing. Allows customizing
+	// specific fields while inheriting org defaults
+	Merge []FileMergeConfig `json:"merge" yaml:"merge"`
 }
+
+// Configures merge behavior for specific files, allowing repo-specific customization of fields
+// while inheriting org defaults
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
+type FileMergeConfig struct {
+	// File path (relative to repo root) to merge. Must be a JSON or YAML file
+	Path string `json:"path" jsonschema:"examples=renovate.json,examples=.github/dependabot.yml,minLength=1,pattern=^[^/].*$,required" yaml:"path"`
+	// Merge strategy to use. deep-merge (default) recursively merges nested objects; shallow-merge
+	// only merges top-level keys
+	Strategy MergeStrategy `json:"strategy" jsonschema:"enum=deep-merge,enum=shallow-merge,enum=overlay,default=deep-merge" yaml:"strategy"`
+	// Static override values to merge with the org template. These values take precedence over org
+	// defaults. Use null to explicitly remove a field from the result
+	Overrides map[string]any `json:"overrides" jsonschema:"required" yaml:"overrides"`
+}
+
+// MergeStrategy defines how organization and repository file contents are merged
+type MergeStrategy string
+
+const (
+	// MergeStrategyDeep recursively merges nested objects. Arrays are replaced, not merged.
+	// Configured overrides take precedence over org defaults at leaf level
+	MergeStrategyDeep MergeStrategy = "deep-merge"
+	// MergeStrategyShallow merges only top-level keys. Nested objects are replaced if overridden,
+	// not merged recursively
+	MergeStrategyShallow MergeStrategy = "shallow-merge"
+	// MergeStrategyOverlay is an alias for deep-merge
+	MergeStrategyOverlay MergeStrategy = "overlay"
+)
 
 // Controls automatic updates of smyklot version references in workflow files when new versions
 // are released
