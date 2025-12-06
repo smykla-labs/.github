@@ -1,5 +1,8 @@
-//nolint:golines // Config structs have jsonschema tags that exceed line length limits
-package config
+// Package configtypes provides minimal type definitions for sync configuration.
+// This package has NO external imports to minimize compilation time for schemagen.
+//
+//nolint:golines // struct tags with jsonschema annotations exceed line limits
+package configtypes
 
 // Configuration for controlling organization-wide synchronization of labels, files, smyklot
 // versions, and repository settings across all repositories
@@ -184,7 +187,7 @@ type RequiredReviews struct {
 	BypassPullRequestAllowances *BypassPullRequestAllowances `json:"bypass_pull_request_allowances" yaml:"bypass_pull_request_allowances"`
 }
 
-// BypassPullRequestAllowances defines who can bypass pull request requirements
+// BypassPullRequestAllowances defines who can bypass pull request requirements.
 type BypassPullRequestAllowances struct {
 	// GitHub usernames that can bypass pull request requirements
 	Users []string `json:"users" yaml:"users"`
@@ -194,7 +197,7 @@ type BypassPullRequestAllowances struct {
 	Apps []string `json:"apps" yaml:"apps"`
 }
 
-// BranchRestrictionsConfig defines who can push to protected branches
+// BranchRestrictionsConfig defines who can push to protected branches.
 type BranchRestrictionsConfig struct {
 	// GitHub usernames allowed to push
 	Users []string `json:"users" yaml:"users"`

@@ -2,6 +2,8 @@ package config
 
 import (
 	"testing"
+
+	"github.com/smykla-labs/.github/internal/configtypes"
 )
 
 func TestParseSyncConfigJSON(t *testing.T) {
@@ -9,13 +11,13 @@ func TestParseSyncConfigJSON(t *testing.T) {
 		name     string
 		input    string
 		wantErr  bool
-		validate func(*testing.T, *SyncConfig)
+		validate func(*testing.T, *configtypes.SyncConfig)
 	}{
 		{
 			name:    "empty string returns default config",
 			input:   "",
 			wantErr: false,
-			validate: func(t *testing.T, cfg *SyncConfig) {
+			validate: func(t *testing.T, cfg *configtypes.SyncConfig) {
 				if cfg == nil {
 					t.Fatal("expected non-nil config")
 				}
@@ -25,7 +27,7 @@ func TestParseSyncConfigJSON(t *testing.T) {
 			name:    "valid JSON with all fields",
 			input:   `{"sync":{"skip":true,"labels":{"skip":false,"exclude":["test"],"allow_removal":true}}}`,
 			wantErr: false,
-			validate: func(t *testing.T, cfg *SyncConfig) {
+			validate: func(t *testing.T, cfg *configtypes.SyncConfig) {
 				if !cfg.Sync.Skip {
 					t.Error("expected sync.skip to be true")
 				}
@@ -72,7 +74,7 @@ func TestParseSyncConfig(t *testing.T) {
 		name     string
 		input    []byte
 		wantErr  bool
-		validate func(*testing.T, *SyncConfig)
+		validate func(*testing.T, *configtypes.SyncConfig)
 	}{
 		{
 			name: "valid YAML",
@@ -86,7 +88,7 @@ sync:
     allow_removal: true
 `),
 			wantErr: false,
-			validate: func(t *testing.T, cfg *SyncConfig) {
+			validate: func(t *testing.T, cfg *configtypes.SyncConfig) {
 				if !cfg.Sync.Skip {
 					t.Error("expected sync.skip to be true")
 				}
@@ -100,7 +102,7 @@ sync:
 			name:    "valid JSON",
 			input:   []byte(`{"sync":{"labels":{"exclude":["test"]}}}`),
 			wantErr: false,
-			validate: func(t *testing.T, cfg *SyncConfig) {
+			validate: func(t *testing.T, cfg *configtypes.SyncConfig) {
 				if len(cfg.Sync.Labels.Exclude) != 1 {
 					t.Errorf("expected 1 excluded label, got %d", len(cfg.Sync.Labels.Exclude))
 				}

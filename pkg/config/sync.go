@@ -1,4 +1,5 @@
-// Package config provides configuration types and parsing.
+// Package config provides sync configuration parsing.
+// Type definitions are in internal/configtypes for minimal import footprint.
 package config
 
 import (
@@ -6,31 +7,33 @@ import (
 
 	"github.com/cockroachdb/errors"
 	"gopkg.in/yaml.v3"
+
+	"github.com/smykla-labs/.github/internal/configtypes"
 )
 
 // ParseSyncConfig parses sync configuration from YAML or JSON.
-func ParseSyncConfig(data []byte) (*SyncConfig, error) {
-	var config SyncConfig
+func ParseSyncConfig(data []byte) (*configtypes.SyncConfig, error) {
+	var cfg configtypes.SyncConfig
 
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		if jsonErr := json.Unmarshal(data, &config); jsonErr != nil {
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		if jsonErr := json.Unmarshal(data, &cfg); jsonErr != nil {
 			return nil, errors.Wrap(err, "parsing sync config as YAML or JSON")
 		}
 	}
 
-	return &config, nil
+	return &cfg, nil
 }
 
 // ParseSyncConfigJSON parses sync configuration from JSON string.
-func ParseSyncConfigJSON(jsonStr string) (*SyncConfig, error) {
+func ParseSyncConfigJSON(jsonStr string) (*configtypes.SyncConfig, error) {
 	if jsonStr == "" {
-		return &SyncConfig{}, nil
+		return &configtypes.SyncConfig{}, nil
 	}
 
-	var config SyncConfig
-	if err := json.Unmarshal([]byte(jsonStr), &config); err != nil {
+	var cfg configtypes.SyncConfig
+	if err := json.Unmarshal([]byte(jsonStr), &cfg); err != nil {
 		return nil, errors.Wrap(err, "parsing sync config JSON")
 	}
 
-	return &config, nil
+	return &cfg, nil
 }

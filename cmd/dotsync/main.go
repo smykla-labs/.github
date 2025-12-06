@@ -12,10 +12,10 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/smykla-labs/.github/internal/configtypes"
 	"github.com/smykla-labs/.github/pkg/config"
 	"github.com/smykla-labs/.github/pkg/github"
 	"github.com/smykla-labs/.github/pkg/logger"
-	"github.com/smykla-labs/.github/pkg/schema"
 )
 
 var version = "dev"
@@ -225,7 +225,7 @@ type syncFunc func(
 	org string,
 	repo string,
 	configFile string,
-	syncConfig *config.SyncConfig,
+	syncConfig *configtypes.SyncConfig,
 	dryRun bool,
 ) error
 
@@ -689,26 +689,10 @@ var reposListCmd = &cobra.Command{
 	},
 }
 
-var configSchemaCmd = &cobra.Command{
-	Use:   "schema",
-	Short: "Generate JSON Schema for sync configuration",
-	Long:  "Generate and output JSON Schema for the sync configuration file format",
-	RunE: func(_ *cobra.Command, _ []string) error {
-		output, err := schema.GenerateSchema("github.com/smykla-labs/.github", "./pkg/config")
-		if err != nil {
-			return err
-		}
-
-		fmt.Println(string(output))
-
-		return nil
-	},
-}
-
-var configVerifyCmd = &cobra.Command{
-	Use:   "verify",
-	Short: "Verify schema is in sync and commit if needed",
-	Long:  "Check if configuration schema file is up to date and commit updates if needed",
+var configVerifyFileCmd = &cobra.Command{
+	Use:   "verify-file",
+	Short: "Verify externally generated schema and commit if needed",
+	Long:  "Compare pre-generated schema file with committed schema, commit if different. Use this when schema is generated externally (e.g., from PR branch code).",
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		ctx := cmd.Context()
 		log := logger.FromContext(ctx)
@@ -725,6 +709,7 @@ var configVerifyCmd = &cobra.Command{
 
 		branch := getStringFlagWithEnvFallback(cmd, "branch", "GITHUB_REF_NAME")
 		schemaFile := getStringFlagWithEnvFallback(cmd, "schema-file", "")
+		generatedSchemaFile := getStringFlagWithEnvFallback(cmd, "generated-schema", "")
 
 		// Validate required fields
 		if repo == "" {
@@ -735,11 +720,23 @@ var configVerifyCmd = &cobra.Command{
 			return errors.New("branch is required (set via --branch flag, INPUT_BRANCH, or GITHUB_REF_NAME)")
 		}
 
-		log.Info("verifying schema sync status",
+		if generatedSchemaFile == "" {
+			return errors.New("generated-schema is required (path to externally generated schema file)")
+		}
+
+		log.Info("verifying schema from external file",
 			"repo", repo,
 			"branch", branch,
 			"schema_file", schemaFile,
+			"generated_schema", generatedSchemaFile,
 		)
+
+		// Read the externally generated schema
+		//nolint:gosec // generatedSchemaFile is controlled input from CLI flags
+		generatedSchema, err := os.ReadFile(generatedSchemaFile)
+		if err != nil {
+			return errors.Wrap(err, "reading generated schema file")
+		}
 
 		// Get GitHub token
 		token, err := github.GetToken(ctx, log, useGHAuth)
@@ -754,13 +751,14 @@ var configVerifyCmd = &cobra.Command{
 		}
 
 		// Verify and commit schema if needed
-		changed, err := github.VerifyAndCommitSchema(
+		changed, err := github.VerifyAndCommitSchemaFromContent(
 			ctx,
 			log,
 			client,
 			repo,
 			branch,
 			schemaFile,
+			generatedSchema,
 			dryRun,
 		)
 		if err != nil {
@@ -769,6 +767,7 @@ var configVerifyCmd = &cobra.Command{
 
 		if changed {
 			log.Info("schema was out of sync and has been committed")
+
 			return errors.New("schema was regenerated - check will pass on re-run")
 		}
 
@@ -815,10 +814,11 @@ func init() {
 	// Configure repos list command flags
 	reposListCmd.Flags().String("format", "json", "Output format (json|names)")
 
-	// Configure config verify command flags
-	configVerifyCmd.Flags().String("repo", "", "Repository (owner/name)")
-	configVerifyCmd.Flags().String("branch", "", "Branch name")
-	configVerifyCmd.Flags().String("schema-file", "schemas/sync-config.schema.json", "Path to schema file")
+	// Configure config verify-file command flags
+	configVerifyFileCmd.Flags().String("repo", "", "Repository (owner/name)")
+	configVerifyFileCmd.Flags().String("branch", "", "Branch name")
+	configVerifyFileCmd.Flags().String("schema-file", "schemas/sync-config.schema.json", "Path to committed schema file")
+	configVerifyFileCmd.Flags().String("generated-schema", "", "Path to externally generated schema file")
 
 	// Build command tree
 	labelsCmd.AddCommand(labelsSyncCmd)
@@ -826,7 +826,7 @@ func init() {
 	smyklotCmd.AddCommand(smyklotSyncCmd)
 	settingsCmd.AddCommand(settingsSyncCmd)
 	reposCmd.AddCommand(reposListCmd)
-	configCmd.AddCommand(configSchemaCmd, configVerifyCmd)
+	configCmd.AddCommand(configVerifyFileCmd)
 
 	// Add commands to root
 	rootCmd.AddCommand(versionCmd)

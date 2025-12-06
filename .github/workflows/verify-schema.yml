@@ -4,11 +4,12 @@ name: Verify Schema
 on:
   pull_request:
     paths:
-      - "pkg/config/**"
-      - "cmd/dotsync/main.go"
-      - "schemas/sync-config.schema.json"
       - "go.mod"
       - "go.sum"
+      - "pkg/config/**"
+      - "pkg/schema/**"
+      - "cmd/schemagen/**"
+      - "schemas/sync-config.schema.json"
       - ".github/workflows/verify-schema.yml"
 
 permissions:
@@ -32,11 +33,21 @@ jobs:
           ref: ${{ github.head_ref }}
           token: ${{ steps.generate-token.outputs.token }}
 
+      - name: Setup Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version-file: go.mod
+
+      - name: Generate schema from PR branch
+        run: go run ./cmd/schemagen > /tmp/generated-schema.json
+
       - name: Verify and commit schema
         uses: ./.github/actions/dotsync
         with:
           command: config
-          subcommand: verify
+          subcommand: verify-file
           token: ${{ steps.generate-token.outputs.token }}
           repo: smykla-labs/.github
           branch: ${{ github.head_ref }}
+          schema_file: schemas/sync-config.schema.json
+          generated_schema: /tmp/generated-schema.json

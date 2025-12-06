@@ -5,19 +5,19 @@ import (
 
 	"github.com/google/go-github/v80/github"
 
-	"github.com/smykla-labs/.github/pkg/config"
+	"github.com/smykla-labs/.github/internal/configtypes"
 )
 
 func TestBuildRulesetFromConfig(t *testing.T) {
 	tests := []struct {
 		name     string
-		config   config.RulesetConfig
+		config   configtypes.RulesetConfig
 		existing *github.RepositoryRuleset
 		validate func(t *testing.T, ruleset *github.RepositoryRuleset)
 	}{
 		{
 			name: "creates basic ruleset with target and enforcement",
-			config: config.RulesetConfig{
+			config: configtypes.RulesetConfig{
 				Name:        "test-ruleset",
 				Target:      "branch",
 				Enforcement: "active",
@@ -39,12 +39,12 @@ func TestBuildRulesetFromConfig(t *testing.T) {
 		},
 		{
 			name: "converts ref name conditions",
-			config: config.RulesetConfig{
+			config: configtypes.RulesetConfig{
 				Name:        "main-protection",
 				Target:      "branch",
 				Enforcement: "active",
-				Conditions: &config.RulesetConditionsConfig{
-					RefName: &config.RefNameCondition{
+				Conditions: &configtypes.RulesetConditionsConfig{
+					RefName: &configtypes.RefNameCondition{
 						Include: []string{"refs/heads/main"},
 						Exclude: []string{"refs/heads/test"},
 					},
@@ -73,11 +73,11 @@ func TestBuildRulesetFromConfig(t *testing.T) {
 		},
 		{
 			name: "converts bypass actors",
-			config: config.RulesetConfig{
+			config: configtypes.RulesetConfig{
 				Name:        "with-bypass",
 				Target:      "branch",
 				Enforcement: "active",
-				BypassActors: []config.BypassActorConfig{
+				BypassActors: []configtypes.BypassActorConfig{
 					{
 						ActorID:    5,
 						ActorType:  "OrganizationAdmin",
@@ -117,11 +117,11 @@ func TestBuildRulesetFromConfig(t *testing.T) {
 		},
 		{
 			name: "converts boolean rules",
-			config: config.RulesetConfig{
+			config: configtypes.RulesetConfig{
 				Name:        "with-bool-rules",
 				Target:      "branch",
 				Enforcement: "active",
-				Rules: &config.RulesetRulesConfig{
+				Rules: &configtypes.RulesetRulesConfig{
 					Deletion:              github.Ptr(true),
 					NonFastForward:        github.Ptr(true),
 					RequiredLinearHistory: github.Ptr(true),
@@ -153,12 +153,12 @@ func TestBuildRulesetFromConfig(t *testing.T) {
 		},
 		{
 			name: "converts pull request rules",
-			config: config.RulesetConfig{
+			config: configtypes.RulesetConfig{
 				Name:        "with-pr-rules",
 				Target:      "branch",
 				Enforcement: "active",
-				Rules: &config.RulesetRulesConfig{
-					PullRequest: &config.PullRequestRuleConfig{
+				Rules: &configtypes.RulesetRulesConfig{
+					PullRequest: &configtypes.PullRequestRuleConfig{
 						RequiredApprovingReviewCount: github.Ptr(2),
 						DismissStaleReviewsOnPush:    github.Ptr(true),
 						RequireCodeOwnerReview:       github.Ptr(true),
@@ -198,14 +198,14 @@ func TestBuildRulesetFromConfig(t *testing.T) {
 		},
 		{
 			name: "converts status checks rule",
-			config: config.RulesetConfig{
+			config: configtypes.RulesetConfig{
 				Name:        "with-status-checks",
 				Target:      "branch",
 				Enforcement: "active",
-				Rules: &config.RulesetRulesConfig{
-					RequiredStatusChecks: &config.StatusChecksRuleConfig{
+				Rules: &configtypes.RulesetRulesConfig{
+					RequiredStatusChecks: &configtypes.StatusChecksRuleConfig{
 						StrictRequiredStatusChecksPolicy: github.Ptr(true),
-						RequiredStatusChecks: []config.StatusCheckConfig{
+						RequiredStatusChecks: []configtypes.StatusCheckConfig{
 							{Context: "ci/lint"},
 							{Context: "ci/test"},
 						},
@@ -235,13 +235,13 @@ func TestBuildRulesetFromConfig(t *testing.T) {
 		},
 		{
 			name: "converts code scanning rule",
-			config: config.RulesetConfig{
+			config: configtypes.RulesetConfig{
 				Name:        "with-code-scanning",
 				Target:      "branch",
 				Enforcement: "active",
-				Rules: &config.RulesetRulesConfig{
-					CodeScanning: &config.CodeScanningRuleConfig{
-						CodeScanningTools: []config.CodeScanningToolConfig{
+				Rules: &configtypes.RulesetRulesConfig{
+					CodeScanning: &configtypes.CodeScanningRuleConfig{
+						CodeScanningTools: []configtypes.CodeScanningToolConfig{
 							{
 								Tool:                    "CodeQL",
 								AlertsThreshold:         "errors",
@@ -289,14 +289,14 @@ func TestBuildRulesetFromConfig(t *testing.T) {
 func TestGetRequiredReviewCountForRuleset(t *testing.T) {
 	tests := []struct {
 		name          string
-		prConfig      *config.PullRequestRuleConfig
+		prConfig      *configtypes.PullRequestRuleConfig
 		existingRules *github.RepositoryRulesetRules
 		expectedCount int
 		testNoUpgrade bool
 	}{
 		{
 			name: "uses desired count when no existing ruleset",
-			prConfig: &config.PullRequestRuleConfig{
+			prConfig: &configtypes.PullRequestRuleConfig{
 				RequiredApprovingReviewCount: github.Ptr(1),
 			},
 			existingRules: nil,
@@ -304,7 +304,7 @@ func TestGetRequiredReviewCountForRuleset(t *testing.T) {
 		},
 		{
 			name: "uses desired count when existing has no PR rule",
-			prConfig: &config.PullRequestRuleConfig{
+			prConfig: &configtypes.PullRequestRuleConfig{
 				RequiredApprovingReviewCount: github.Ptr(2),
 			},
 			existingRules: &github.RepositoryRulesetRules{},
@@ -312,7 +312,7 @@ func TestGetRequiredReviewCountForRuleset(t *testing.T) {
 		},
 		{
 			name: "uses desired count when higher than existing",
-			prConfig: &config.PullRequestRuleConfig{
+			prConfig: &configtypes.PullRequestRuleConfig{
 				RequiredApprovingReviewCount: github.Ptr(3),
 			},
 			existingRules: &github.RepositoryRulesetRules{
@@ -324,7 +324,7 @@ func TestGetRequiredReviewCountForRuleset(t *testing.T) {
 		},
 		{
 			name: "keeps existing count when higher than desired (no-downgrade)",
-			prConfig: &config.PullRequestRuleConfig{
+			prConfig: &configtypes.PullRequestRuleConfig{
 				RequiredApprovingReviewCount: github.Ptr(1),
 			},
 			existingRules: &github.RepositoryRulesetRules{
@@ -337,7 +337,7 @@ func TestGetRequiredReviewCountForRuleset(t *testing.T) {
 		},
 		{
 			name: "uses zero when config specifies zero",
-			prConfig: &config.PullRequestRuleConfig{
+			prConfig: &configtypes.PullRequestRuleConfig{
 				RequiredApprovingReviewCount: github.Ptr(0),
 			},
 			existingRules: nil,
@@ -371,9 +371,9 @@ func TestGetRequiredReviewCountForRuleset(t *testing.T) {
 
 func TestBuildStatusChecksRulePreservesExisting(t *testing.T) {
 	// Test that empty status checks in config preserves existing checks
-	config := &config.StatusChecksRuleConfig{
+	config := &configtypes.StatusChecksRuleConfig{
 		StrictRequiredStatusChecksPolicy: github.Ptr(true),
-		RequiredStatusChecks:             []config.StatusCheckConfig{}, // Empty
+		RequiredStatusChecks:             []configtypes.StatusCheckConfig{}, // Empty
 	}
 
 	existingCheck := &github.RuleStatusCheck{
@@ -402,9 +402,9 @@ func TestBuildStatusChecksRulePreservesExisting(t *testing.T) {
 
 func TestBuildStatusChecksRuleOverridesExisting(t *testing.T) {
 	// Test that explicit status checks in config override existing checks
-	config := &config.StatusChecksRuleConfig{
+	config := &configtypes.StatusChecksRuleConfig{
 		StrictRequiredStatusChecksPolicy: github.Ptr(true),
-		RequiredStatusChecks: []config.StatusCheckConfig{
+		RequiredStatusChecks: []configtypes.StatusCheckConfig{
 			{Context: "new-check-1"},
 			{Context: "new-check-2"},
 		},

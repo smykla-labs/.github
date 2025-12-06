@@ -6,7 +6,7 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/google/go-github/v80/github"
 
-	"github.com/smykla-labs/.github/pkg/config"
+	"github.com/smykla-labs/.github/internal/configtypes"
 	"github.com/smykla-labs/.github/pkg/logger"
 )
 
@@ -17,7 +17,7 @@ func SyncRulesets(
 	client *Client,
 	org string,
 	repo string,
-	rulesets []config.RulesetConfig,
+	rulesets []configtypes.RulesetConfig,
 	exclude []string,
 	dryRun bool,
 ) error {
@@ -105,7 +105,7 @@ func createOrUpdateRuleset(
 	client *Client,
 	org string,
 	repo string,
-	rulesetConfig config.RulesetConfig,
+	rulesetConfig configtypes.RulesetConfig,
 	existing *github.RepositoryRuleset,
 ) error {
 	// Build ruleset from config
@@ -137,7 +137,7 @@ func createOrUpdateRuleset(
 
 // buildRulesetFromConfig converts config ruleset to go-github RepositoryRuleset.
 func buildRulesetFromConfig(
-	rulesetConfig config.RulesetConfig,
+	rulesetConfig configtypes.RulesetConfig,
 	existing *github.RepositoryRuleset,
 ) *github.RepositoryRuleset {
 	target := github.RulesetTarget(rulesetConfig.Target)
@@ -169,7 +169,7 @@ func buildRulesetFromConfig(
 
 // buildConditions converts config conditions to go-github RepositoryRulesetConditions.
 func buildConditions(
-	conditionsConfig *config.RulesetConditionsConfig,
+	conditionsConfig *configtypes.RulesetConditionsConfig,
 ) *github.RepositoryRulesetConditions {
 	conditions := &github.RepositoryRulesetConditions{}
 
@@ -191,7 +191,7 @@ func buildConditions(
 }
 
 // buildBypassActors converts config bypass actors to go-github BypassActor.
-func buildBypassActors(actorsConfig []config.BypassActorConfig) []*github.BypassActor {
+func buildBypassActors(actorsConfig []configtypes.BypassActorConfig) []*github.BypassActor {
 	actors := make([]*github.BypassActor, 0, len(actorsConfig))
 
 	for _, actorConfig := range actorsConfig {
@@ -211,7 +211,7 @@ func buildBypassActors(actorsConfig []config.BypassActorConfig) []*github.Bypass
 
 // buildRules converts config rules to go-github RepositoryRulesetRules.
 func buildRules(
-	rulesConfig *config.RulesetRulesConfig,
+	rulesConfig *configtypes.RulesetRulesConfig,
 	existing *github.RepositoryRuleset,
 ) *github.RepositoryRulesetRules {
 	rules := &github.RepositoryRulesetRules{}
@@ -266,7 +266,7 @@ func buildRules(
 
 // buildPullRequestRule converts config PR rule to go-github PullRequestRuleParameters.
 func buildPullRequestRule(
-	prConfig *config.PullRequestRuleConfig,
+	prConfig *configtypes.PullRequestRuleConfig,
 	existing *github.RepositoryRuleset,
 ) *github.PullRequestRuleParameters {
 	prRule := &github.PullRequestRuleParameters{}
@@ -308,7 +308,7 @@ func buildPullRequestRule(
 
 // getRequiredReviewCountForRuleset implements no-downgrade logic for ruleset review counts.
 func getRequiredReviewCountForRuleset(
-	prConfig *config.PullRequestRuleConfig,
+	prConfig *configtypes.PullRequestRuleConfig,
 	existing *github.RepositoryRuleset,
 ) int {
 	if prConfig.RequiredApprovingReviewCount == nil {
@@ -334,7 +334,7 @@ func getRequiredReviewCountForRuleset(
 
 // buildStatusChecksRule converts config status checks to go-github RequiredStatusChecksRuleParameters.
 func buildStatusChecksRule(
-	statusConfig *config.StatusChecksRuleConfig,
+	statusConfig *configtypes.StatusChecksRuleConfig,
 	existing *github.RepositoryRuleset,
 ) *github.RequiredStatusChecksRuleParameters {
 	rule := &github.RequiredStatusChecksRuleParameters{}
@@ -373,7 +373,7 @@ func buildStatusChecksRule(
 
 // buildCodeScanningRule converts config code scanning to go-github CodeScanningRuleParameters.
 func buildCodeScanningRule(
-	csConfig *config.CodeScanningRuleConfig,
+	csConfig *configtypes.CodeScanningRuleConfig,
 ) *github.CodeScanningRuleParameters {
 	rule := &github.CodeScanningRuleParameters{}
 

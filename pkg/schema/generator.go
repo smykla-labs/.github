@@ -8,7 +8,7 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/invopop/jsonschema"
 
-	"github.com/smykla-labs/.github/pkg/config"
+	"github.com/smykla-labs/.github/internal/configtypes"
 )
 
 // GenerateSchema generates JSON Schema for sync configuration.
@@ -24,7 +24,7 @@ func GenerateSchema(modulePath, configPkgPath string) ([]byte, error) {
 		return nil, errors.Wrap(err, "loading Go comments for schema descriptions")
 	}
 
-	schema := reflector.Reflect(&config.SyncConfig{})
+	schema := reflector.Reflect(&configtypes.SyncConfig{})
 	schema.Version = "https://json-schema.org/draft/2020-12/schema"
 	schema.ID = "https://raw.githubusercontent.com/smykla-labs/.github/main/schemas/sync-config.schema.json"
 	schema.Title = "Sync Configuration"

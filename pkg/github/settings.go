@@ -10,7 +10,7 @@ import (
 	"github.com/google/go-github/v80/github"
 	"gopkg.in/yaml.v3"
 
-	"github.com/smykla-labs/.github/pkg/config"
+	"github.com/smykla-labs/.github/internal/configtypes"
 	"github.com/smykla-labs/.github/pkg/logger"
 )
 
@@ -21,11 +21,11 @@ type SettingsFile struct {
 
 // SettingsDefinition contains all repository settings to sync.
 type SettingsDefinition struct {
-	Repository       config.RepositorySettingsConfig     `yaml:"repository"`
-	Features         config.FeaturesConfig               `yaml:"features"`
-	Security         config.SecurityConfig               `yaml:"security"`
-	BranchProtection []config.BranchProtectionRuleConfig `yaml:"branch_protection"`
-	Rulesets         []config.RulesetConfig              `yaml:"rulesets"`
+	Repository       configtypes.RepositorySettingsConfig     `yaml:"repository"`
+	Features         configtypes.FeaturesConfig               `yaml:"features"`
+	Security         configtypes.SecurityConfig               `yaml:"security"`
+	BranchProtection []configtypes.BranchProtectionRuleConfig `yaml:"branch_protection"`
+	Rulesets         []configtypes.RulesetConfig              `yaml:"rulesets"`
 }
 
 // SyncSettings synchronizes repository settings from a YAML file to a target repository.
@@ -36,7 +36,7 @@ func SyncSettings(
 	org string,
 	repo string,
 	settingsFile string,
-	syncConfig *config.SyncConfig,
+	syncConfig *configtypes.SyncConfig,
 	dryRun bool,
 ) error {
 	// Check if sync is skipped
@@ -176,7 +176,7 @@ func applyAllSettingsChanges(
 	repo string,
 	repoChanges *github.Repository,
 	hasBranchProtectionChanges bool,
-	branchProtectionRules []config.BranchProtectionRuleConfig,
+	branchProtectionRules []configtypes.BranchProtectionRuleConfig,
 ) error {
 	if repoChanges != nil {
 		if err := applyRepositoryChanges(ctx, client, org, repo, repoChanges); err != nil {
@@ -247,7 +247,7 @@ func isSettingExcluded(path string, exclude []string) bool {
 
 // computeRepositorySettingsDiff computes repository settings that need updating.
 func computeRepositorySettingsDiff(
-	desired *config.RepositorySettingsConfig,
+	desired *configtypes.RepositorySettingsConfig,
 	current *github.Repository,
 	exclude []string,
 ) *github.Repository {
@@ -303,7 +303,7 @@ func computeRepositorySettingsDiff(
 
 // computeFeaturesDiff computes feature settings that need updating.
 func computeFeaturesDiff(
-	desired *config.FeaturesConfig,
+	desired *configtypes.FeaturesConfig,
 	current *github.Repository,
 	exclude []string,
 ) *github.Repository {
@@ -351,7 +351,7 @@ func computeFeaturesDiff(
 
 // computeSecurityDiff computes security settings that need updating.
 func computeSecurityDiff(
-	desired *config.SecurityConfig,
+	desired *configtypes.SecurityConfig,
 	current *github.Repository,
 	exclude []string,
 ) *github.Repository {
@@ -587,7 +587,7 @@ func syncBranchProtection(
 	client *Client,
 	org string,
 	repo string,
-	rules []config.BranchProtectionRuleConfig,
+	rules []configtypes.BranchProtectionRuleConfig,
 ) error {
 	// Get all branches in the repository
 	branches, err := fetchBranches(ctx, client, org, repo)
@@ -692,7 +692,7 @@ func applyBranchProtection(
 	org string,
 	repo string,
 	branch string,
-	rule *config.BranchProtectionRuleConfig,
+	rule *configtypes.BranchProtectionRuleConfig,
 ) error {
 	// Fetch current protection settings
 	currentProtection, err := fetchBranchProtection(ctx, client, org, repo, branch)
@@ -731,7 +731,7 @@ func fetchBranchProtection(
 
 // buildProtectionRequest builds a protection request from config and current state.
 func buildProtectionRequest(
-	rule *config.BranchProtectionRuleConfig,
+	rule *configtypes.BranchProtectionRuleConfig,
 	current *github.Protection,
 ) *github.ProtectionRequest {
 	req := &github.ProtectionRequest{}
@@ -799,7 +799,7 @@ func buildProtectionRequest(
 
 // getRequiredReviewCount implements no-downgrade logic for review counts.
 func getRequiredReviewCount(
-	rule *config.BranchProtectionRuleConfig,
+	rule *configtypes.BranchProtectionRuleConfig,
 	current *github.Protection,
 ) int {
 	if rule.RequiredReviews == nil || rule.RequiredReviews.RequiredApprovingReviewCount == nil {

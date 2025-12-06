@@ -11,7 +11,7 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/google/go-github/v80/github"
 
-	"github.com/smykla-labs/.github/pkg/config"
+	"github.com/smykla-labs/.github/internal/configtypes"
 	"github.com/smykla-labs/.github/pkg/logger"
 )
 
@@ -56,7 +56,7 @@ func SyncFiles(
 	repo string,
 	sourceRepo string,
 	filesConfig string,
-	syncConfig *config.SyncConfig,
+	syncConfig *configtypes.SyncConfig,
 	branchPrefix string,
 	prLabels []string,
 	dryRun bool,
@@ -190,7 +190,7 @@ func processFileMapping(
 	repo string,
 	sourceRepo string,
 	mapping FileMapping,
-	syncConfig *config.SyncConfig,
+	syncConfig *configtypes.SyncConfig,
 	stats *FileSyncStats,
 ) []FileChange {
 	log.Debug("processing file", "dest", mapping.Dest)

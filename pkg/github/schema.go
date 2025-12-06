@@ -9,20 +9,21 @@ import (
 
 	"github.com/cockroachdb/errors"
 	"github.com/google/go-github/v80/github"
-
-	"github.com/smykla-labs/.github/pkg/schema"
 )
 
-// VerifyAndCommitSchema verifies schema is in sync and commits if needed.
+// VerifyAndCommitSchemaFromContent compares pre-generated schema with committed
+// schema and commits if different. Use this when schema is generated externally
+// (e.g., from PR branch code) to avoid using stale types baked into container.
 //
 //nolint:funlen // complex function with API calls and error handling
-func VerifyAndCommitSchema(
+func VerifyAndCommitSchemaFromContent(
 	ctx context.Context,
 	log *slog.Logger,
 	client *Client,
 	repo string,
 	branch string,
 	schemaFile string,
+	generatedSchema []byte,
 	dryRun bool,
 ) (bool, error) {
 	const ownerNameParts = 2
@@ -34,14 +35,6 @@ func VerifyAndCommitSchema(
 	}
 
 	owner, name := parts[0], parts[1]
-
-	// Generate current schema
-	log.Info("generating schema")
-
-	output, err := schema.GenerateSchema("github.com/smykla-labs/.github", "./pkg/config")
-	if err != nil {
-		return false, errors.Wrap(err, "generating schema")
-	}
 
 	// Read current schema file
 	log.Info("reading committed schema", "file", schemaFile)
@@ -55,7 +48,7 @@ func VerifyAndCommitSchema(
 	// Compare schemas (normalize JSON for comparison)
 	var generated, current map[string]any
 
-	if err = json.Unmarshal(output, &generated); err != nil {
+	if err = json.Unmarshal(generatedSchema, &generated); err != nil {
 		return false, errors.Wrap(err, "unmarshaling generated schema")
 	}
 
@@ -106,7 +99,7 @@ func VerifyAndCommitSchema(
 
 	// Create blob for updated schema
 	blob := github.Blob{
-		Content:  github.Ptr(string(output)),
+		Content:  github.Ptr(string(generatedSchema)),
 		Encoding: github.Ptr("utf-8"),
 	}
 

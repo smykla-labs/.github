@@ -8,7 +8,7 @@ import (
 	"github.com/google/go-github/v80/github"
 	"gopkg.in/yaml.v3"
 
-	"github.com/smykla-labs/.github/pkg/config"
+	"github.com/smykla-labs/.github/internal/configtypes"
 	"github.com/smykla-labs/.github/pkg/logger"
 )
 
@@ -37,7 +37,7 @@ func SyncLabels(
 	org string,
 	repo string,
 	labelsFile string,
-	syncConfig *config.SyncConfig,
+	syncConfig *configtypes.SyncConfig,
 	dryRun bool,
 ) error {
 	// Check if sync is skipped

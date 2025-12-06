@@ -9,7 +9,7 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/google/go-github/v80/github"
 
-	"github.com/smykla-labs/.github/pkg/config"
+	"github.com/smykla-labs/.github/internal/configtypes"
 	"github.com/smykla-labs/.github/pkg/logger"
 )
 
@@ -34,7 +34,7 @@ func SyncSmyklot(
 	repo string,
 	version string,
 	tag string,
-	syncConfig *config.SyncConfig,
+	syncConfig *configtypes.SyncConfig,
 	dryRun bool,
 ) error {
 	// Check if sync is skipped
@@ -131,7 +131,7 @@ func SyncSmyklot(
 }
 
 // getSkipReason returns the reason for skipping smyklot sync.
-func getSkipReason(syncConfig *config.SyncConfig) string {
+func getSkipReason(syncConfig *configtypes.SyncConfig) string {
 	if syncConfig.Sync.Skip {
 		return "smyklot version synchronization is disabled for this repository (sync.skip=true)"
 	}

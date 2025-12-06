@@ -9,7 +9,7 @@ inputs:
     description: Command to execute (labels, files, settings, smyklot, repos, config)
     required: true
   subcommand:
-    description: Subcommand to execute (sync, discover, list, verify)
+    description: Subcommand to execute (sync, discover, list, verify, verify-file)
     required: true
 
   # Auth (optional - defaults to GITHUB_TOKEN via CLI)
@@ -81,6 +81,10 @@ inputs:
     default: ""
   schema_file:
     description: Path to schema file (config verify)
+    required: false
+    default: ""
+  generated_schema:
+    description: Path to externally generated schema file (config verify-file)
     required: false
     default: ""
 
