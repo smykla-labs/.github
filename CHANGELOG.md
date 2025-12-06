@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.4](https://github.com/smykla-labs/.github/compare/dotsync/v1.4.3...dotsync/v1.4.4) (2025-12-06)
+
+### Bug Fixes
+
+* **merge:** compact short arrays on single line ([1b4836e](https://github.com/smykla-labs/.github/commit/1b4836e856e01191521b0840e2265415d8a93c2c))
+
 ## [1.4.3](https://github.com/smykla-labs/.github/compare/dotsync/v1.4.2...dotsync/v1.4.3) (2025-12-06)
 
 ### Bug Fixes
