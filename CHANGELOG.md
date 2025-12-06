@@ -1,3 +1,5 @@
+# Changelog
+
 ## [1.2.2](https://github.com/smykla-labs/.github/compare/dotsync/v1.2.1...dotsync/v1.2.2) (2025-12-05)
 
 ### Bug Fixes
@@ -5,10 +7,6 @@
 * **actions:** use snake_case for action inputs ([3f1f20d](https://github.com/smykla-labs/.github/commit/3f1f20dc712ab44b0b5d7b000c0ef2adb6e93355))
 * **release:** prevent duplicate changelog titles ([e36f1e8](https://github.com/smykla-labs/.github/commit/e36f1e8cb78eb402621c83087664931e58132ae8))
 * **release:** remove invalid empty changelogTitle ([ab483a9](https://github.com/smykla-labs/.github/commit/ab483a91729db993105663e11a3e3a37876208fc))
-
-<!-- markdownlint-disable MD024 -->
-
-# Changelog
 
 ## [1.2.1](https://github.com/smykla-labs/.github/compare/dotsync/v1.2.0...dotsync/v1.2.1) (2025-12-05)
 
@@ -40,8 +38,3 @@
 
 * **cli:** deduplicate sync command logic ([6dac25e](https://github.com/smykla-labs/.github/commit/6dac25e9b44fe6895309b024ca8ec23600c94d15))
 * **cli:** migrate from Kong to Cobra ([#10](https://github.com/smykla-labs/.github/issues/10)) ([c372a63](https://github.com/smykla-labs/.github/commit/c372a639236480be5f342f3b08287046a3873b82))
-
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).

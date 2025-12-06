@@ -34,6 +34,7 @@ templates/                  # Source files for file sync (auto-discovered)
 **Architecture**: Go CLI (`dotsync`) → container (`ghcr.io/smykla-labs/dotsync`) → composite action
 
 **Unified Action** (`.github/actions/dotsync/action.yml`):
+
 ```yaml
 - uses: ./.github/actions/dotsync
   with:
@@ -55,6 +56,7 @@ templates/                  # Source files for file sync (auto-discovered)
 ### Per-Repo Config
 
 Repos customize via `.github/sync-config.yml`:
+
 ```yaml
 sync:
   skip: false           # Skip ALL syncs
@@ -109,10 +111,12 @@ All workflows use **smyklot** GitHub App:
 **CLI** (`cmd/dotsync/`): Main sync tool, add new commands here via Cobra subcommands
 
 **Schemagen** (`cmd/schemagen/`): JSON Schema generator, run via `go run ./cmd/schemagen`
+
 - Uses `internal/configtypes` (zero external imports) for fast compilation (~1.5s)
 - NOT released as binary - always run from source to use current branch types
 
 **Config types** (`internal/configtypes/`): All sync config structs, zero imports
+
 - `pkg/config/sync.go` imports configtypes and adds parsing functions
 - `pkg/github/*.go` imports configtypes for type references
 
@@ -123,26 +127,31 @@ All workflows use **smyklot** GitHub App:
 All rules in `.golangci.yml` are strictly enforced. Code WILL NOT pass CI if violated.
 
 **Errors** (depguard + forbidigo - NO EXCEPTIONS):
+
 - ONLY `github.com/cockroachdb/errors` - anything else fails lint
 - `errors` stdlib → DENIED
 - `github.com/pkg/errors` → DENIED
 - `fmt.Errorf` → FORBIDDEN, use `errors.New`, `errors.Wrap`, `errors.Wrapf`
 
 **Function limits** (funlen + cyclop):
+
 - Max 100 lines, 50 statements per function
 - Cyclomatic complexity max: 30
 
 **Imports** (gci - enforced order):
+
 1. Standard library
 2. External packages
 3. Local (`github.com/smykla-labs/.github`)
 
 **nolint directives** (nolintlint - REQUIRED format):
+
 - Must specify linter: `//nolint:lintername`
 - Must have explanation: `//nolint:lintername // reason`
 - Bare `//nolint` will fail
 
 **Whitespace** (wsl_v5):
+
 - Blank line before returns, after control flow blocks
 - Run `task fmt` to auto-fix
 
