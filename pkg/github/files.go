@@ -240,7 +240,7 @@ func processFileMapping(
 	var mergeStrategy configtypes.MergeStrategy
 
 	if mergeConfig != nil {
-		log.Debug(
+		log.Info(
 			"found merge config for file",
 			"file", mapping.Dest,
 			"strategy", mergeConfig.Strategy,
