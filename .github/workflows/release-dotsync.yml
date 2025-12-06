@@ -1,10 +1,25 @@
 ---
 # Release workflow for dotsync
-# Triggers on PR merge with release labels, daily at 10 AM UTC, or manually
+# Triggers on:
+# - Push to main with relevant file changes
+# - PR merge with release labels
+# - Daily at 10 AM UTC
+# - Manual dispatch
 
 name: Release dotsync
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "cmd/dotsync/**"
+      - "pkg/**"
+      - "internal/**"
+      - "go.mod"
+      - "go.sum"
+      - ".goreleaser.yml"
+      - "Dockerfile"
+      - ".github/workflows/release-dotsync.yml"
   pull_request:
     types: [closed]
     branches: [main]
@@ -21,6 +36,7 @@ jobs:
     name: Check Conditions
     runs-on: ubuntu-24.04
     if: |
+      (github.event_name == 'push') ||
       (github.event_name == 'schedule') ||
       (github.event_name == 'workflow_dispatch') ||
       (github.event_name == 'pull_request' &&
