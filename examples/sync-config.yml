@@ -291,7 +291,7 @@ sync: {}
 #
 # "repository" section fields:
 #   - allow_merge_commit, allow_rebase_merge, allow_squash_merge (bool)
-#   - squash_merge_commit_title: "COMMIT_OR_PR_TITLE" | "PR_TITLE" | "COMMIT_MESSAGES"
+#   - squash_merge_commit_title: "COMMIT_OR_PR_TITLE" | "PR_TITLE"
 #   - squash_merge_commit_message: "PR_BODY" | "COMMIT_MESSAGES" | "BLANK"
 #   - allow_update_branch, allow_auto_merge, delete_branch_on_merge (bool)
 #   - default_branch, description, homepage, visibility (string)
@@ -301,10 +301,9 @@ sync: {}
 #   - has_issues, has_wiki, has_projects, has_discussions, has_pages (bool)
 #
 # "security" section fields:
-#   - automated_security_fixes, vulnerability_alerts (string: enabled/disabled)
-#   - secret_scanning: { status, push_protection, validity_checks }
-#   - code_scanning: { default_setup, query_suite, languages }
-#   - private_vulnerability_reporting (bool)
+#   - secret_scanning: "enabled" | "disabled"
+#   - secret_scanning_push_protection: "enabled" | "disabled"
+#   - dependabot_security_updates: "enabled" | "disabled"
 #
 # Branch protection (section = pattern like "main") fields:
 #   - allow_deletions, allow_force_pushes, enforce_admins (bool)
@@ -349,10 +348,8 @@ sync: {}
 #       - section: "security"
 #         strategy: "deep-merge"
 #         overrides:
-#           secret_scanning:
-#             status: "enabled"
-#             push_protection: "enabled"
-#             validity_checks: "enabled"
+#           secret_scanning: "enabled"
+#           secret_scanning_push_protection: "enabled"
 
 # Example 17: Override branch protection for main branch (require more reviewers)
 # Branch protection rules are identified by their pattern
@@ -362,8 +359,8 @@ sync: {}
 #       - section: "main"  # Matches branch_protection with pattern "main"
 #         strategy: "deep-merge"
 #         overrides:
-#           required_pull_request_reviews:
-#             required_approving_review_count: 3  # Override org default of 2
+#           required_reviews:
+#             count: 3  # Override org default of 2
 
 # Example 18: Customize ruleset by name (stricter rules for release branches)
 # Rulesets are identified by their name field
@@ -374,10 +371,8 @@ sync: {}
 #         strategy: "deep-merge"
 #         overrides:
 #           rules:
-#             required_linear_history:
-#               active: true
-#             required_signatures:
-#               active: true
+#             required_linear_history: true
+#             required_signatures: true
 
 # Example 19: Multiple settings sections with different strategies
 # sync:

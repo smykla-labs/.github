@@ -73,6 +73,12 @@ func generateAllSchemas(outputDir string) error {
 func generateSingleSchema(schemaType string) error {
 	st := schema.SchemaType(schemaType)
 
+	// Validate schema type before calling generation function
+	if st != schema.SchemaSyncConfig && st != schema.SchemaSettings {
+		return errors.Newf("invalid schema type %q: must be %q or %q",
+			schemaType, schema.SchemaSyncConfig, schema.SchemaSettings)
+	}
+
 	output, err := schema.GenerateSchemaForType(modulePath, configPkgPath, st)
 	if err != nil {
 		return err

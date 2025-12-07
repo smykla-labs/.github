@@ -202,13 +202,13 @@ func buildSettingsOverrideDefinitions(
 		defName := "SettingsOverride_" + st.name
 		actualSchema := resolveTypeSchema(typeSchema)
 
+		// Only add the reference when actualSchema is successfully resolved
 		if actualSchema != nil {
 			schema.Definitions[defName] = createOverrideSchema(actualSchema, st.name)
+			anyOfRefs = append(anyOfRefs, &jsonschema.Schema{
+				Ref: "#/$defs/" + defName,
+			})
 		}
-
-		anyOfRefs = append(anyOfRefs, &jsonschema.Schema{
-			Ref: "#/$defs/" + defName,
-		})
 	}
 
 	// Also allow plain object for flexibility (advanced use cases)

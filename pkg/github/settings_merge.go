@@ -5,6 +5,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/smykla-labs/.github/internal/configtypes"
+	"github.com/smykla-labs/.github/pkg/logger"
 	"github.com/smykla-labs/.github/pkg/merge"
 )
 
@@ -130,6 +131,7 @@ func mergeRulesetConfig(
 // It iterates through merge configs and applies overrides to matching sections.
 // Returns original settings and nil error if no merge configs exist (graceful no-op).
 func ApplySettingsMerge(
+	log *logger.Logger,
 	orgSettings *SettingsDefinition,
 	syncConfig *configtypes.SyncConfig,
 ) (*SettingsDefinition, error) {
@@ -137,7 +139,9 @@ func ApplySettingsMerge(
 		return orgSettings, nil
 	}
 
-	// Create a copy to avoid mutating the original
+	// Create a copy to avoid mutating the original.
+	// Repository, Features, Security are value types (no pointer fields) - safe for shallow copy.
+	// BranchProtection and Rulesets slices are deep copied below.
 	bpLen := len(orgSettings.BranchProtection)
 	rsLen := len(orgSettings.Rulesets)
 
@@ -156,6 +160,11 @@ func ApplySettingsMerge(
 	for _, mergeConfig := range syncConfig.Sync.Settings.Merge {
 		if err := applySingleMerge(result, &mergeConfig); err != nil {
 			// Log warning and continue - graceful degradation
+			log.Warn("failed to apply settings merge",
+				"section", mergeConfig.Section,
+				"error", err,
+			)
+
 			continue
 		}
 	}
