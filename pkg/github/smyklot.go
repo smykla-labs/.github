@@ -179,9 +179,9 @@ func SyncSmyklot(
 		}
 	}
 
-	// Version-only sync for other workflows if enabled and no workflow structure changes
-	if orgConfig.SyncVersion && len(changes) == 0 && len(workflowFiles) > 0 {
-		log.Debug("no workflow structure changes, checking for version-only updates")
+	// Version-only sync for other workflows if enabled
+	if orgConfig.SyncVersion != nil && *orgConfig.SyncVersion && len(workflowFiles) > 0 {
+		log.Debug("checking for version-only updates")
 
 		for _, workflowPath := range workflowFiles {
 			// Skip the managed workflow files
@@ -667,6 +667,8 @@ func fetchSmyklotOrgConfig(
 			return nil, errors.Wrap(err, "parsing smyklot config")
 		}
 
+		config.SetDefaults()
+
 		return &config, nil
 	}
 
@@ -682,7 +684,7 @@ func fetchSmyklotOrgConfig(
 		if isNotFoundError(err) {
 			// Return default config if file doesn't exist
 			return &configtypes.SmyklotFile{
-				SyncVersion: true,
+				SyncVersion: boolPtr(true),
 				Workflows: configtypes.SmyklotWorkflowsConfig{
 					PrCommands:    boolPtr(true),
 					PollReactions: boolPtr(true),
@@ -702,6 +704,8 @@ func fetchSmyklotOrgConfig(
 	if err := yaml.Unmarshal([]byte(content), &config); err != nil {
 		return nil, errors.Wrap(err, "parsing smyklot org config")
 	}
+
+	config.SetDefaults()
 
 	return &config, nil
 }

@@ -420,7 +420,15 @@ type CodeScanningToolConfig struct {
 //nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type SmyklotFile struct {
 	// Whether to sync version references in existing workflows. Default: true
-	SyncVersion bool `json:"sync_version" jsonschema:"default=true" yaml:"sync_version"`
+	SyncVersion *bool `json:"sync_version" jsonschema:"default=true" yaml:"sync_version"`
 	// Which workflows to sync to all repositories by default
 	Workflows SmyklotWorkflowsConfig `json:"workflows" yaml:"workflows"`
+}
+
+// SetDefaults sets default values for SmyklotFile fields if they are nil.
+func (sf *SmyklotFile) SetDefaults() {
+	if sf.SyncVersion == nil {
+		val := true
+		sf.SyncVersion = &val
+	}
 }
