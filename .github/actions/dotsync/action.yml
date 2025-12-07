@@ -71,6 +71,18 @@ inputs:
     description: Smyklot git tag to sync (smyklot sync)
     required: false
     default: ""
+  sha:
+    description: Smyklot commit SHA to sync (smyklot sync)
+    required: false
+    default: ""
+  smyklot_file:
+    description: Path to smyklot.yml config file (smyklot sync)
+    required: false
+    default: ""
+  smyklot_templates_dir:
+    description: Path to smyklot workflow templates directory (smyklot sync)
+    required: false
+    default: ""
   templates_dir:
     description: Path to templates directory (files discover)
     required: false
