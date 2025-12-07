@@ -38,6 +38,8 @@ jobs:
             file: schemas/sync-config.schema.json
           - name: settings
             file: schemas/settings.schema.json
+          - name: smyklot
+            file: schemas/smyklot.schema.json
     steps:
       - name: Generate token
         id: generate-token
