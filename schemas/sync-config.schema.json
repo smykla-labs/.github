@@ -7,6 +7,10 @@
           "type": "object"
         },
         "path": {
+          "examples": [
+            "renovate.json",
+            ".github/dependabot.yml"
+          ],
           "minLength": 1,
           "pattern": "^[^/].*$",
           "type": "string"
@@ -110,11 +114,50 @@
           "type": "array",
           "uniqueItems": true
         },
+        "merge": {
+          "items": {
+            "$ref": "#/$defs/SettingsMergeConfig"
+          },
+          "type": "array"
+        },
         "skip": {
           "default": false,
           "type": "boolean"
         }
       },
+      "type": "object"
+    },
+    "SettingsMergeConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "overrides": {
+          "type": "object"
+        },
+        "section": {
+          "examples": [
+            "repository",
+            "features",
+            "security",
+            "main",
+            "release/*"
+          ],
+          "minLength": 1,
+          "type": "string"
+        },
+        "strategy": {
+          "default": "deep-merge",
+          "enum": [
+            "deep-merge",
+            "shallow-merge",
+            "overlay"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "section",
+        "overrides"
+      ],
       "type": "object"
     },
     "SmyklotConfig": {
