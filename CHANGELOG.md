@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.0](https://github.com/smykla-labs/.github/compare/dotsync/v1.4.5...dotsync/v1.5.0) (2025-12-07)
+
+### Features
+
+* **settings:** add merge and dual schema ([#19](https://github.com/smykla-labs/.github/issues/19)) ([285d68b](https://github.com/smykla-labs/.github/commit/285d68b229b4b3da976891fc10481840e7bbebb0))
+
 ## [1.4.5](https://github.com/smykla-labs/.github/compare/dotsync/v1.4.4...dotsync/v1.4.5) (2025-12-06)
 
 ### Bug Fixes
