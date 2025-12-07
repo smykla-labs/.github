@@ -37,6 +37,11 @@
 #   settings:                    # Settings sync configuration
 #     skip: bool                 # Skip settings sync (default: false)
 #     exclude: [string]          # Settings paths to exclude from sync
+#     merge:                     # Settings merge configuration
+#       - section: string        # Section to merge (repository, features, security,
+#                                # or branch pattern/ruleset name for array items)
+#         strategy: string       # Merge strategy: "deep-merge" or "shallow-merge"
+#         overrides: object      # Override values to merge with org settings
 #
 # ---------------------------------------------------------------------------
 # FIELD DETAILS
@@ -113,6 +118,33 @@
 #   Paths use dot notation to reference nested fields.
 #   Examples: ["branch_protection", "rulesets", "security.secret_scanning", "features.has_wiki"]
 #   Entire sections or individual fields can be excluded.
+#
+# sync.settings.merge (array of objects, default: [])
+#   Configure settings sections to MERGE with org defaults instead of replacing entirely.
+#   This allows repos to customize specific fields while inheriting org-wide settings.
+#   Follows RFC 7396 (JSON Merge Patch) semantics: objects merge recursively, arrays replaced.
+#
+# sync.settings.merge[].section (string, required)
+#   Section identifier to merge. Valid values:
+#   - "repository": Repository settings (name, description, visibility, merge options, etc.)
+#   - "features": Feature flags (has_wiki, has_issues, has_projects, has_discussions, etc.)
+#   - "security": Security settings (secret_scanning, push_protection, dependabot, etc.)
+#   - Branch pattern: For branch protection rules, use the pattern (e.g., "main", "release/*")
+#   - Ruleset name: For rulesets, use the ruleset name (e.g., "main-protection")
+#
+# sync.settings.merge[].strategy (string, default: "deep-merge")
+#   Merge strategy to use:
+#   - "deep-merge": Recursively merge nested objects (override values win at leaf level)
+#   - "shallow-merge": Only merge top-level keys (nested objects completely replaced)
+#   - "overlay": Alias for "deep-merge"
+#
+# sync.settings.merge[].overrides (object, required)
+#   Key-value pairs to override in the org settings. Must match the structure
+#   defined in the settings schema for the specified section. See:
+#   https://raw.githubusercontent.com/smykla-labs/.github/main/schemas/settings.schema.json
+#   Set value to null to explicitly remove a field from the result.
+#   For deep-merge: nested paths merged recursively.
+#   For shallow-merge: top-level keys only.
 #
 # ---------------------------------------------------------------------------
 # EXAMPLES
@@ -242,3 +274,153 @@ sync: {}
 #         strategy: "shallow-merge"
 #         overrides:
 #           MD013: false  # Disable line length rule
+
+# ---------------------------------------------------------------------------
+# SETTINGS MERGE EXAMPLES
+# ---------------------------------------------------------------------------
+# Settings merge allows per-repo customization of specific settings while
+# inheriting org-wide defaults. Unlike exclude (which skips entirely), merge
+# lets you override specific fields.
+#
+# SCHEMA REFERENCE:
+# The overrides field accepts any valid settings structure. For the complete
+# list of available fields, see the settings schema:
+# https://raw.githubusercontent.com/smykla-labs/.github/main/schemas/settings.schema.json
+#
+# Key settings sections and their available fields:
+#
+# "repository" section fields:
+#   - allow_merge_commit, allow_rebase_merge, allow_squash_merge (bool)
+#   - squash_merge_commit_title: "COMMIT_OR_PR_TITLE" | "PR_TITLE" | "COMMIT_MESSAGES"
+#   - squash_merge_commit_message: "PR_BODY" | "COMMIT_MESSAGES" | "BLANK"
+#   - allow_update_branch, allow_auto_merge, delete_branch_on_merge (bool)
+#   - default_branch, description, homepage, visibility (string)
+#   - web_commit_signoff_required, is_template, has_downloads (bool)
+#
+# "features" section fields:
+#   - has_issues, has_wiki, has_projects, has_discussions, has_pages (bool)
+#
+# "security" section fields:
+#   - automated_security_fixes, vulnerability_alerts (string: enabled/disabled)
+#   - secret_scanning: { status, push_protection, validity_checks }
+#   - code_scanning: { default_setup, query_suite, languages }
+#   - private_vulnerability_reporting (bool)
+#
+# Branch protection (section = pattern like "main") fields:
+#   - allow_deletions, allow_force_pushes, enforce_admins (bool)
+#   - require_linear_history, required_conversation_resolution (bool)
+#   - required_reviews: { required_approving_review_count, dismiss_stale_reviews, ... }
+#   - required_status_checks: { strict, contexts, do_not_enforce_on_create }
+#   - restrictions: { users, teams, apps }
+#
+# Rulesets (section = ruleset name) fields:
+#   - target (branch/tag), enforcement (active/disabled/evaluate)
+#   - bypass_actors: [{ actor_id, actor_type, bypass_mode }]
+#   - conditions: { ref_name: { include, exclude } }
+#   - rules: { creation, update, deletion, required_signatures, ... }
+
+# Example 14: Override repository settings (enable squash-only merges)
+# sync:
+#   settings:
+#     merge:
+#       - section: "repository"
+#         strategy: "deep-merge"
+#         overrides:
+#           allow_merge_commit: false   # Disable merge commits
+#           allow_rebase_merge: false   # Disable rebase merges
+#           allow_squash_merge: true    # Only squash merges allowed
+#           squash_merge_commit_title: "PR_TITLE"
+#           squash_merge_commit_message: "PR_BODY"
+
+# Example 15: Enable wiki for documentation repo (org default has it disabled)
+# sync:
+#   settings:
+#     merge:
+#       - section: "features"
+#         strategy: "deep-merge"
+#         overrides:
+#           has_wiki: true
+#           has_discussions: true
+
+# Example 16: Customize security settings (stricter scanning for sensitive repo)
+# sync:
+#   settings:
+#     merge:
+#       - section: "security"
+#         strategy: "deep-merge"
+#         overrides:
+#           secret_scanning:
+#             status: "enabled"
+#             push_protection: "enabled"
+#             validity_checks: "enabled"
+
+# Example 17: Override branch protection for main branch (require more reviewers)
+# Branch protection rules are identified by their pattern
+# sync:
+#   settings:
+#     merge:
+#       - section: "main"  # Matches branch_protection with pattern "main"
+#         strategy: "deep-merge"
+#         overrides:
+#           required_pull_request_reviews:
+#             required_approving_review_count: 3  # Override org default of 2
+
+# Example 18: Customize ruleset by name (stricter rules for release branches)
+# Rulesets are identified by their name field
+# sync:
+#   settings:
+#     merge:
+#       - section: "release-protection"  # Matches ruleset with name "release-protection"
+#         strategy: "deep-merge"
+#         overrides:
+#           rules:
+#             required_linear_history:
+#               active: true
+#             required_signatures:
+#               active: true
+
+# Example 19: Multiple settings sections with different strategies
+# sync:
+#   settings:
+#     merge:
+#       - section: "repository"
+#         strategy: "deep-merge"
+#         overrides:
+#           description: "Custom repository description"
+#           homepage: "https://example.com/docs"
+#       - section: "features"
+#         strategy: "shallow-merge"  # Replace entire features block
+#         overrides:
+#           has_issues: true
+#           has_wiki: false
+#           has_projects: false
+#           has_discussions: true
+
+# Example 20: Remove specific field from org settings (use null)
+# sync:
+#   settings:
+#     merge:
+#       - section: "repository"
+#         strategy: "deep-merge"
+#         overrides:
+#           homepage: null  # Remove homepage set by org
+
+# Example 21: Combine exclude and merge (skip some, customize others)
+# sync:
+#   settings:
+#     exclude:
+#       - "rulesets"  # Don't sync rulesets at all for this repo
+#     merge:
+#       - section: "repository"
+#         strategy: "deep-merge"
+#         overrides:
+#           allow_auto_merge: true
+#       - section: "main"  # Customize main branch protection
+#         strategy: "deep-merge"
+#         overrides:
+#           required_status_checks:
+#             strict: true
+#             contexts:
+#               - "build"
+#               - "test"
+#               - "security-scan"
