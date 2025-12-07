@@ -6,11 +6,20 @@ on:
     paths:
       - "go.mod"
       - "go.sum"
+      - "internal/configtypes/**"
       - "pkg/config/**"
+      - "pkg/github/**"
       - "pkg/schema/**"
       - "cmd/schemagen/**"
-      - "schemas/sync-config.schema.json"
       - ".github/workflows/verify-schema.yml"
+      - "schemas/*.schema.json"
+
+# Prevent infinite loops: cancel in-progress runs when new commits arrive
+# Note: matrix context is not available at workflow level, but this is intentional -
+# we want all matrix jobs cancelled together when a new commit arrives
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -19,6 +28,16 @@ permissions:
 jobs:
   verify-schema:
     runs-on: ubuntu-24.04
+    # Only run for PRs from the same repository (not forks)
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        schema:
+          - name: sync-config
+            file: schemas/sync-config.schema.json
+          - name: settings
+            file: schemas/settings.schema.json
     steps:
       - name: Generate token
         id: generate-token
@@ -33,15 +52,31 @@ jobs:
           ref: ${{ github.head_ref }}
           token: ${{ steps.generate-token.outputs.token }}
 
+      - name: Check for bot commit
+        id: check-bot
+        run: |
+          AUTHOR=$(git log -1 --format='%an')
+          if [[ "$AUTHOR" == *"smyklot"* ]] || [[ "$AUTHOR" == *"[bot]"* ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "⏭️ Skipping: last commit was from bot ($AUTHOR)"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup Go
+        if: steps.check-bot.outputs.skip != 'true'
         uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
           go-version-file: go.mod
 
-      - name: Generate schema from PR branch
-        run: go run ./cmd/schemagen > /tmp/generated-schema.json
+      - name: Generate schema
+        if: steps.check-bot.outputs.skip != 'true'
+        env:
+          SCHEMA_TYPE: ${{ matrix.schema.name }}
+        run: go run ./cmd/schemagen --type "$SCHEMA_TYPE" > "${{ runner.temp }}/generated-schema.json"
 
       - name: Verify and commit schema
+        if: steps.check-bot.outputs.skip != 'true'
         uses: ./.github/actions/dotsync
         with:
           command: config
@@ -49,5 +84,5 @@ jobs:
           token: ${{ steps.generate-token.outputs.token }}
           repo: smykla-labs/.github
           branch: ${{ github.head_ref }}
-          schema_file: schemas/sync-config.schema.json
-          generated_schema: /tmp/generated-schema.json
+          schema_file: ${{ matrix.schema.file }}
+          generated_schema: ${{ runner.temp }}/generated-schema.json

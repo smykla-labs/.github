@@ -54,28 +54,32 @@ func splitLabels(labels string) []string {
 }
 
 // getStringFlagWithEnvFallback retrieves a string flag value with environment variable fallback.
-// Priority: 1) explicit flag value, 2) INPUT_* env var, 3) GitHub standard env var.
+// Priority: 1) explicit flag value, 2) INPUT_* env var, 3) GitHub standard env var, 4) flag default.
 func getStringFlagWithEnvFallback(cmd *cobra.Command, flagName, githubEnvFallback string) string {
-	// Check explicit flag value
-	val, _ := cmd.Flags().GetString(flagName)
-	if val != "" {
+	// Check if flag was explicitly set on command line
+	if cmd.Flags().Changed(flagName) {
+		val, _ := cmd.Flags().GetString(flagName)
 		return val
 	}
 
 	// Check INPUT_* env var (from GitHub Actions input)
 	inputEnv := "INPUT_" + strings.ToUpper(strings.ReplaceAll(flagName, "-", "_"))
 
-	val = os.Getenv(inputEnv)
-	if val != "" {
+	if val := os.Getenv(inputEnv); val != "" {
 		return val
 	}
 
 	// Fall back to GitHub standard env var
 	if githubEnvFallback != "" {
-		return os.Getenv(githubEnvFallback)
+		if val := os.Getenv(githubEnvFallback); val != "" {
+			return val
+		}
 	}
 
-	return ""
+	// Fall back to flag default value
+	val, _ := cmd.Flags().GetString(flagName)
+
+	return val
 }
 
 // getPersistentStringFlagWithEnvFallback retrieves a persistent flag value with environment variable fallback.

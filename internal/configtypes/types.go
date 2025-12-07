@@ -117,6 +117,28 @@ type SettingsConfig struct {
 	Skip bool `json:"skip" jsonschema:"default=false" yaml:"skip"`
 	// Specific settings sections or fields to exclude from sync
 	Exclude []string `json:"exclude" jsonschema:"examples=branch_protection,examples=security.secret_scanning,minLength=1,uniqueItems=true" yaml:"exclude"`
+	// Settings sections to merge with repo-specific overrides instead of replacing. Allows
+	// customizing specific fields while inheriting org defaults
+	Merge []SettingsMergeConfig `json:"merge" yaml:"merge"`
+}
+
+// Configures merge behavior for specific settings sections, allowing repo-specific customization
+// of fields while inheriting org defaults. Use section names like "repository", "features",
+// "security" for top-level sections, or branch protection patterns and ruleset names for array
+// items
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
+type SettingsMergeConfig struct {
+	// Section identifier to merge. Use "repository", "features", or "security" for top-level
+	// sections. For branch protection rules, use the pattern (e.g., "main", "release/*"). For
+	// rulesets, use the ruleset name
+	Section string `json:"section" jsonschema:"minLength=1,required" yaml:"section"`
+	// Merge strategy to use. deep-merge (default) recursively merges nested objects; shallow-merge
+	// only merges top-level keys
+	Strategy MergeStrategy `json:"strategy" jsonschema:"enum=deep-merge,enum=shallow-merge,enum=overlay,default=deep-merge" yaml:"strategy"`
+	// Static override values to merge with the org settings. These values take precedence over org
+	// defaults. Use null to explicitly remove a field from the result
+	Overrides map[string]any `json:"overrides" jsonschema:"required" yaml:"overrides"`
 }
 
 // Configures merge strategies and branch cleanup behavior for pull requests
@@ -133,6 +155,13 @@ type RepositorySettingsConfig struct {
 	AllowAutoMerge *bool `json:"allow_auto_merge" yaml:"allow_auto_merge"`
 	// Automatically delete head branch after pull request is merged
 	DeleteBranchOnMerge *bool `json:"delete_branch_on_merge" yaml:"delete_branch_on_merge"`
+	// Allow users to update the head branch of a pull request with the latest changes from the
+	// base branch
+	AllowUpdateBranch *bool `json:"allow_update_branch" yaml:"allow_update_branch"`
+	// Title format for squash merge commits (COMMIT_OR_PR_TITLE or PR_TITLE)
+	SquashMergeCommitTitle *string `json:"squash_merge_commit_title" jsonschema:"enum=COMMIT_OR_PR_TITLE,enum=PR_TITLE" yaml:"squash_merge_commit_title"`
+	// Message format for squash merge commits (PR_BODY, COMMIT_MESSAGES, or BLANK)
+	SquashMergeCommitMessage *string `json:"squash_merge_commit_message" jsonschema:"enum=PR_BODY,enum=COMMIT_MESSAGES,enum=BLANK" yaml:"squash_merge_commit_message"`
 }
 
 // Controls which GitHub features are enabled for the repository (Issues, Wiki, Projects,
@@ -337,6 +366,9 @@ type StatusChecksRuleConfig struct {
 	StrictRequiredStatusChecksPolicy *bool `json:"strict_required_status_checks_policy" yaml:"strict_required_status_checks_policy"`
 	// Required status checks. Empty array = skip setting checks (inherit repo's existing)
 	RequiredStatusChecks []StatusCheckConfig `json:"required_status_checks" yaml:"required_status_checks"`
+	// When true, do not enforce status check requirements on branches created from protected
+	// branches. New branches can temporarily bypass checks when first created
+	DoNotEnforceOnCreate *bool `json:"do_not_enforce_on_create" yaml:"do_not_enforce_on_create"`
 }
 
 // Defines a single required status check with context name and optional integration ID
