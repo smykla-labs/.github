@@ -12,8 +12,11 @@ on:
       - "pkg/schema/**"
       - "cmd/schemagen/**"
       - ".github/workflows/verify-schema.yml"
+      - "schemas/*.schema.json"
 
 # Prevent infinite loops: cancel in-progress runs when new commits arrive
+# Note: matrix context is not available at workflow level, but this is intentional -
+# we want all matrix jobs cancelled together when a new commit arrives
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref }}
   cancel-in-progress: true
@@ -82,4 +85,4 @@ jobs:
           repo: smykla-labs/.github
           branch: ${{ github.head_ref }}
           schema_file: ${{ matrix.schema.file }}
-          generated_schema: /github/runner_temp/generated-schema.json
+          generated_schema: ${{ runner.temp }}/generated-schema.json

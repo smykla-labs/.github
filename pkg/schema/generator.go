@@ -165,16 +165,14 @@ func normalizeDescriptions(v any) {
 // settingsOverrideTypes maps section names to their corresponding config types.
 // These are used to provide proper type definitions for SettingsMergeConfig.overrides.
 var settingsOverrideTypes = []struct {
-	name      string
-	typeRef   any
-	isArray   bool
-	arrayItem any
+	name    string
+	typeRef any
 }{
-	{"RepositorySettingsConfig", &configtypes.RepositorySettingsConfig{}, false, nil},
-	{"FeaturesConfig", &configtypes.FeaturesConfig{}, false, nil},
-	{"SecurityConfig", &configtypes.SecurityConfig{}, false, nil},
-	{"BranchProtectionRuleConfig", &configtypes.BranchProtectionRuleConfig{}, false, nil},
-	{"RulesetConfig", &configtypes.RulesetConfig{}, false, nil},
+	{"RepositorySettingsConfig", &configtypes.RepositorySettingsConfig{}},
+	{"FeaturesConfig", &configtypes.FeaturesConfig{}},
+	{"SecurityConfig", &configtypes.SecurityConfig{}},
+	{"BranchProtectionRuleConfig", &configtypes.BranchProtectionRuleConfig{}},
+	{"RulesetConfig", &configtypes.RulesetConfig{}},
 }
 
 // injectSettingsDefinitions adds settings type definitions to the sync-config schema
