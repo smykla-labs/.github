@@ -28,6 +28,12 @@ on:
     - cron: '0 10 * * *'
   workflow_dispatch:
 
+# Only one release workflow at a time. Running workflow is never canceled,
+# but pending (waiting) workflows are canceled when a newer one is triggered.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 permissions: {}
 
 jobs:
@@ -129,8 +135,14 @@ jobs:
           echo "Disabling sync workflows..."
 
           for workflow in $SYNC_WORKFLOWS; do
-            echo "  Disabling $workflow"
-            gh workflow disable "$workflow" --repo smykla-labs/.github
+            state=$(gh workflow view "$workflow" --repo smykla-labs/.github --json state --jq '.state')
+
+            if [ "$state" = "active" ]; then
+              echo "  Disabling $workflow"
+              gh workflow disable "$workflow" --repo smykla-labs/.github
+            else
+              echo "  Skipping $workflow (already $state)"
+            fi
           done
 
           echo "✅ Sync workflows disabled"
@@ -363,8 +375,14 @@ jobs:
           echo "Re-enabling sync workflows..."
 
           for workflow in $SYNC_WORKFLOWS; do
-            echo "  Enabling $workflow"
-            gh workflow enable "$workflow" --repo smykla-labs/.github
+            state=$(gh workflow view "$workflow" --repo smykla-labs/.github --json state --jq '.state')
+
+            if [ "$state" != "active" ]; then
+              echo "  Enabling $workflow"
+              gh workflow enable "$workflow" --repo smykla-labs/.github
+            else
+              echo "  Skipping $workflow (already active)"
+            fi
           done
 
           echo "✅ Sync workflows re-enabled"
