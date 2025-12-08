@@ -16,7 +16,7 @@ tasks:
   # Linting
   lint:
     desc: Run all linters
-    deps: [lint:go, lint:markdown, lint:mod]
+    deps: [lint:go, lint:markdown, lint:mod, lint:schema]
     cmd: echo "✅ All linters passed!"
 
   lint:go:
@@ -45,6 +45,29 @@ tasks:
       - echo "▶ Verifying Go modules"
       - go mod verify
       - echo "✓ Go modules verified"
+
+  lint:schema:
+    desc: Lint JSON Schema files
+    cmds:
+      - echo "▶ Linting JSON Schema files"
+      - mise exec -- jsonschema lint --strict schemas/*.schema.json
+      - echo "✓ JSON Schema files pass linting"
+
+  # Schema generation
+  schema:generate:
+    desc: Generate JSON Schema files
+    sources:
+      - internal/configtypes/**/*.go
+      - pkg/github/*.go
+      - pkg/schema/*.go
+      - cmd/schemagen/*.go
+    generates:
+      - schemas/*.schema.json
+    cmds:
+      - echo "▶ Generating JSON Schema files"
+      - mise exec -- go run ./cmd/schemagen --all --output-dir=schemas/
+      - mise exec -- jsonschema fmt schemas/*.schema.json
+      - echo "✓ Schemas generated and formatted"
 
   # Formatting
   fmt:
