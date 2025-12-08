@@ -37,8 +37,6 @@ type SmyklotSyncStats struct {
 }
 
 // SyncSmyklot synchronizes smyklot workflows and version references.
-//
-//nolint:gocognit,nestif,funlen // complexity from workflow template sync logic
 func SyncSmyklot(
 	ctx context.Context,
 	log *logger.Logger,
@@ -55,15 +53,7 @@ func SyncSmyklot(
 ) error {
 	// Check if sync is skipped
 	if syncConfig.Sync.Skip || syncConfig.Sync.Smyklot.Skip {
-		log.Info("smyklot sync skipped by config")
-
-		// Check for existing PR to close
-		skipReason := getSkipReason(syncConfig)
-		if err := closeSmyklotPR(ctx, log, client, org, repo, skipReason); err != nil {
-			log.Warn("failed to close existing PR", "error", err)
-		}
-
-		return nil
+		return handleSkippedSync(ctx, log, client, org, repo, syncConfig)
 	}
 
 	// Fetch org-level smyklot config
@@ -84,122 +74,22 @@ func SyncSmyklot(
 		return errors.Wrap(err, "listing workflow files")
 	}
 
-	// Create a map of existing workflows for quick lookup
-	existingWorkflows := make(map[string]bool)
-
-	for _, path := range workflowFiles {
-		filename := filepath.Base(path)
-		existingWorkflows[filename] = true
-	}
+	// Build map of existing workflows (name without extension -> full path)
+	existingWorkflows := buildExistingWorkflowsMap(workflowFiles)
 
 	// Process workflow templates
 	stats := &SmyklotSyncStats{}
 
-	var changes []FileChange
-
-	workflowNames := []string{WorkflowPrCommands, WorkflowPollReactions}
-
-	for _, workflowName := range workflowNames {
-		if !shouldSyncWorkflow(orgConfig, syncConfig, workflowName) {
-			log.Debug("workflow sync disabled by config", "workflow", workflowName)
-
-			continue
-		}
-
-		// Read and render template
-		templateContent, err := readWorkflowTemplate(templatesDir, workflowName)
-		if err != nil {
-			log.Warn("failed to read workflow template", "workflow", workflowName, "error", err)
-
-			continue
-		}
-
-		expectedContent := renderWorkflowTemplate(templateContent, tag, sha)
-		workflowPath := ".github/workflows/" + workflowName + ".yml"
-
-		// Check if workflow already exists
-		if existingWorkflows[workflowName+".yml"] {
-			// Fetch existing workflow
-			fileContent, _, _, fetchErr := client.Repositories.GetContents(
-				ctx, org, repo, workflowPath, nil,
-			)
-			if fetchErr != nil {
-				log.Warn(
-					"failed to fetch existing workflow",
-					"path",
-					workflowPath,
-					"error",
-					fetchErr,
-				)
-
-				continue
-			}
-
-			existingContent, decodeErr := fileContent.GetContent()
-			if decodeErr != nil {
-				log.Warn(
-					"failed to decode existing workflow",
-					"path",
-					workflowPath,
-					"error",
-					decodeErr,
-				)
-
-				continue
-			}
-
-			// Compare content
-			if existingContent != string(expectedContent) {
-				log.Debug("workflow differs from template, will replace",
-					"workflow", workflowName)
-
-				stats.Replaced++
-				stats.ReplacedFiles = append(stats.ReplacedFiles, workflowPath)
-
-				changes = append(changes, FileChange{
-					Path:    workflowPath,
-					Content: expectedContent,
-					Action:  "update",
-				})
-			} else {
-				log.Debug("workflow matches template", "workflow", workflowName)
-
-				stats.Skipped++
-			}
-		} else {
-			// Workflow doesn't exist, install it
-			log.Debug("workflow not found, will install", "workflow", workflowName)
-
-			stats.Installed++
-			stats.InstalledFiles = append(stats.InstalledFiles, workflowPath)
-
-			changes = append(changes, FileChange{
-				Path:    workflowPath,
-				Content: expectedContent,
-				Action:  "create",
-			})
-		}
-	}
+	changes := syncManagedWorkflows(
+		ctx, log, client, org, repo, tag, sha,
+		orgConfig, syncConfig, templatesDir, existingWorkflows, stats,
+	)
 
 	// Version-only sync for other workflows if enabled
-	if orgConfig.SyncVersion != nil && *orgConfig.SyncVersion && len(workflowFiles) > 0 {
-		log.Debug("checking for version-only updates")
-
-		for _, workflowPath := range workflowFiles {
-			// Skip the managed workflow files
-			filename := filepath.Base(workflowPath)
-			if filename == WorkflowPrCommands+".yml" || filename == WorkflowPollReactions+".yml" {
-				continue
-			}
-
-			change, processed := processWorkflowFile(
-				ctx, log, client, org, repo, workflowPath, version, tag, stats,
-			)
-			if processed {
-				changes = append(changes, change)
-			}
-		}
-	}
+	changes = append(changes, syncVersionOnlyWorkflows(
+		ctx, log, client, org, repo, version, tag,
+		orgConfig, workflowFiles, stats,
+	)...)
 
 	// Log stats
 	log.Info("smyklot sync summary",
@@ -256,6 +146,257 @@ func getSkipReason(syncConfig *configtypes.SyncConfig) string {
 	}
 
 	return "smyklot version synchronization is disabled for this repository (sync.smyklot.skip=true)"
+}
+
+// handleSkippedSync handles the case when smyklot sync is skipped by config.
+func handleSkippedSync(
+	ctx context.Context,
+	log *logger.Logger,
+	client *Client,
+	org string,
+	repo string,
+	syncConfig *configtypes.SyncConfig,
+) error {
+	log.Info("smyklot sync skipped by config")
+
+	skipReason := getSkipReason(syncConfig)
+	if err := closeSmyklotPR(ctx, log, client, org, repo, skipReason); err != nil {
+		log.Warn("failed to close existing PR", "error", err)
+	}
+
+	return nil
+}
+
+// buildExistingWorkflowsMap creates a map of workflow names to their full paths.
+func buildExistingWorkflowsMap(workflowFiles []string) map[string]string {
+	existingWorkflows := make(map[string]string)
+
+	for _, path := range workflowFiles {
+		filename := filepath.Base(path)
+		nameWithoutExt := strings.TrimSuffix(strings.TrimSuffix(filename, ".yml"), ".yaml")
+		existingWorkflows[nameWithoutExt] = path
+	}
+
+	return existingWorkflows
+}
+
+// syncManagedWorkflows syncs the managed workflow templates (pr-commands, poll-reactions).
+func syncManagedWorkflows(
+	ctx context.Context,
+	log *logger.Logger,
+	client *Client,
+	org string,
+	repo string,
+	tag string,
+	sha string,
+	orgConfig *configtypes.SmyklotFile,
+	syncConfig *configtypes.SyncConfig,
+	templatesDir string,
+	existingWorkflows map[string]string,
+	stats *SmyklotSyncStats,
+) []FileChange {
+	var changes []FileChange
+
+	workflowNames := []string{WorkflowPrCommands, WorkflowPollReactions}
+
+	for _, workflowName := range workflowNames {
+		if !shouldSyncWorkflow(orgConfig, syncConfig, workflowName) {
+			log.Debug("workflow sync disabled by config", "workflow", workflowName)
+
+			continue
+		}
+
+		workflowChanges := syncSingleManagedWorkflow(
+			ctx, log, client, org, repo, workflowName, tag, sha,
+			templatesDir, existingWorkflows, stats,
+		)
+		changes = append(changes, workflowChanges...)
+	}
+
+	return changes
+}
+
+// syncSingleManagedWorkflow syncs a single managed workflow template.
+func syncSingleManagedWorkflow(
+	ctx context.Context,
+	log *logger.Logger,
+	client *Client,
+	org string,
+	repo string,
+	workflowName string,
+	tag string,
+	sha string,
+	templatesDir string,
+	existingWorkflows map[string]string,
+	stats *SmyklotSyncStats,
+) []FileChange {
+	templateContent, err := readWorkflowTemplate(templatesDir, workflowName)
+	if err != nil {
+		log.Warn("failed to read workflow template", "workflow", workflowName, "error", err)
+
+		return nil
+	}
+
+	expectedContent := renderWorkflowTemplate(templateContent, tag, sha)
+	targetPath := ".github/workflows/" + workflowName + ".yml"
+	existingPath, exists := existingWorkflows[workflowName]
+
+	if !exists {
+		return handleNewWorkflow(log, workflowName, targetPath, expectedContent, stats)
+	}
+
+	return handleExistingWorkflow(
+		ctx, log, client, org, repo, workflowName,
+		existingPath, targetPath, expectedContent, stats,
+	)
+}
+
+// handleNewWorkflow handles installing a new workflow that doesn't exist.
+func handleNewWorkflow(
+	log *logger.Logger,
+	workflowName string,
+	targetPath string,
+	expectedContent []byte,
+	stats *SmyklotSyncStats,
+) []FileChange {
+	log.Debug("workflow not found, will install", "workflow", workflowName)
+
+	stats.Installed++
+	stats.InstalledFiles = append(stats.InstalledFiles, targetPath)
+
+	return []FileChange{{
+		Path:    targetPath,
+		Content: expectedContent,
+		Action:  "create",
+	}}
+}
+
+// handleExistingWorkflow handles updating an existing workflow.
+func handleExistingWorkflow(
+	ctx context.Context,
+	log *logger.Logger,
+	client *Client,
+	org string,
+	repo string,
+	workflowName string,
+	existingPath string,
+	targetPath string,
+	expectedContent []byte,
+	stats *SmyklotSyncStats,
+) []FileChange {
+	fileContent, _, _, fetchErr := client.Repositories.GetContents(
+		ctx, org, repo, existingPath, nil,
+	)
+	if fetchErr != nil {
+		log.Warn("failed to fetch existing workflow", "path", existingPath, "error", fetchErr)
+
+		return nil
+	}
+
+	existingContent, decodeErr := fileContent.GetContent()
+	if decodeErr != nil {
+		log.Warn("failed to decode existing workflow", "path", existingPath, "error", decodeErr)
+
+		return nil
+	}
+
+	needsExtensionFix := strings.HasSuffix(existingPath, ".yaml")
+	contentMatches := existingContent == string(expectedContent)
+
+	switch {
+	case needsExtensionFix:
+		return handleExtensionNormalization(
+			log, workflowName, existingPath, targetPath, expectedContent, stats,
+		)
+
+	case !contentMatches:
+		return handleContentUpdate(log, workflowName, targetPath, expectedContent, stats)
+
+	default:
+		log.Debug("workflow matches template", "workflow", workflowName)
+
+		stats.Skipped++
+
+		return nil
+	}
+}
+
+// handleExtensionNormalization handles renaming .yaml to .yml.
+func handleExtensionNormalization(
+	log *logger.Logger,
+	workflowName string,
+	existingPath string,
+	targetPath string,
+	expectedContent []byte,
+	stats *SmyklotSyncStats,
+) []FileChange {
+	log.Debug("normalizing workflow extension from .yaml to .yml", "workflow", workflowName)
+
+	stats.Replaced++
+	stats.ReplacedFiles = append(stats.ReplacedFiles, targetPath)
+
+	return []FileChange{
+		{Path: existingPath, Action: "delete"},
+		{Path: targetPath, Content: expectedContent, Action: "create"},
+	}
+}
+
+// handleContentUpdate handles updating workflow content.
+func handleContentUpdate(
+	log *logger.Logger,
+	workflowName string,
+	targetPath string,
+	expectedContent []byte,
+	stats *SmyklotSyncStats,
+) []FileChange {
+	log.Debug("workflow differs from template, will replace", "workflow", workflowName)
+
+	stats.Replaced++
+	stats.ReplacedFiles = append(stats.ReplacedFiles, targetPath)
+
+	return []FileChange{{
+		Path:    targetPath,
+		Content: expectedContent,
+		Action:  "update",
+	}}
+}
+
+// syncVersionOnlyWorkflows syncs version references in non-managed workflows.
+func syncVersionOnlyWorkflows(
+	ctx context.Context,
+	log *logger.Logger,
+	client *Client,
+	org string,
+	repo string,
+	version string,
+	tag string,
+	orgConfig *configtypes.SmyklotFile,
+	workflowFiles []string,
+	stats *SmyklotSyncStats,
+) []FileChange {
+	if orgConfig.SyncVersion == nil || !*orgConfig.SyncVersion || len(workflowFiles) == 0 {
+		return nil
+	}
+
+	log.Debug("checking for version-only updates")
+
+	var changes []FileChange
+
+	for _, workflowPath := range workflowFiles {
+		filename := filepath.Base(workflowPath)
+		if filename == WorkflowPrCommands+".yml" || filename == WorkflowPollReactions+".yml" {
+			continue
+		}
+
+		change, processed := processWorkflowFile(
+			ctx, log, client, org, repo, workflowPath, version, tag, stats,
+		)
+		if processed {
+			changes = append(changes, change)
+		}
+	}
+
+	return changes
 }
 
 // listWorkflowFiles lists all workflow files in .github/workflows directory.
