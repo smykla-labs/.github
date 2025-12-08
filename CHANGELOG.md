@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.9.0](https://github.com/smykla-labs/.github/compare/dotsync/v1.8.0...dotsync/v1.9.0) (2025-12-08)
+
+### Features
+
+* **sync:** add step summaries and config options ([#22](https://github.com/smykla-labs/.github/issues/22)) ([6d0e8ab](https://github.com/smykla-labs/.github/commit/6d0e8ab615c86792a9a80040b9b37034529e6d00))
+
+### Dependencies
+
+* **deps:** pin dependencies ([#23](https://github.com/smykla-labs/.github/issues/23)) ([8dca367](https://github.com/smykla-labs/.github/commit/8dca367c8d2f0830bda937af313def0ceffb63de))
+* **deps:** update dependency golangci-lint to v2.7.2 ([#24](https://github.com/smykla-labs/.github/issues/24)) ([94b1eef](https://github.com/smykla-labs/.github/commit/94b1eef06ce6fd652605fb1be6bb6743fe39b960))
+
 ## [1.8.0](https://github.com/smykla-labs/.github/compare/dotsync/v1.7.0...dotsync/v1.8.0) (2025-12-08)
 
 ### Features
