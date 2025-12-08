@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.7.0](https://github.com/smykla-labs/.github/compare/dotsync/v1.6.1...dotsync/v1.7.0) (2025-12-08)
+
+### Features
+
+* **sync-smyklot:** add use_latest option ([1b43374](https://github.com/smykla-labs/.github/commit/1b433747f995b61542f13047514a81983707d103))
+
+### Bug Fixes
+
+* **rulesets:** use empty arrays instead of nil ([fe5b4a7](https://github.com/smykla-labs/.github/commit/fe5b4a765e2a390c8cc14aeb4ebd8c03d1f3aac3))
+
 ## [1.6.1](https://github.com/smykla-labs/.github/compare/dotsync/v1.6.0...dotsync/v1.6.1) (2025-12-08)
 
 ### Code Refactoring
