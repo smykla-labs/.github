@@ -84,3 +84,24 @@ jobs:
           repo: ${{ matrix.repo.name }}
           files_config: ${{ needs.prepare.outputs.files_config }}
           dry_run: ${{ inputs.dry_run || 'false' }}
+
+      - name: Report sync status
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          REPO: ${{ github.repository_owner }}/${{ matrix.repo.name }}
+          REPO_NAME: ${{ matrix.repo.name }}
+        run: |
+          echo "### 📁 ${REPO_NAME}" >> "$GITHUB_STEP_SUMMARY"
+
+          PR_JSON=$(gh pr list --repo "$REPO" --state open \
+            --search "chore(sync): sync organization files in:title" \
+            --json number,url --jq '.[0] // empty' 2>/dev/null || true)
+
+          if [[ -n "$PR_JSON" ]]; then
+            PR_NUM=$(echo "$PR_JSON" | jq -r '.number')
+            PR_URL=$(echo "$PR_JSON" | jq -r '.url')
+            echo "✅ Sync PR: [#${PR_NUM}](${PR_URL})" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ℹ️ No sync PR (files up to date or dry run)" >> "$GITHUB_STEP_SUMMARY"
+          fi
