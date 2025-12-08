@@ -22,12 +22,12 @@
       "properties": {
         "poll_reactions": {
           "default": true,
-          "description": "Sync poll-reactions workflow. Default: true",
+          "description": "Sync smyklot-poll workflow. Default: true",
           "type": "boolean"
         },
         "pr_commands": {
           "default": true,
-          "description": "Sync pr-commands workflow. Default: true",
+          "description": "Sync smyklot-pr-commands workflow. Default: true",
           "type": "boolean"
         }
       },

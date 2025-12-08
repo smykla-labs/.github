@@ -929,7 +929,7 @@
       "properties": {
         "skip": {
           "default": false,
-          "description": "Skip version-only updates in workflow files. Managed workflows (pr-commands, poll-reactions) are still synced unless their respective workflow flags are disabled",
+          "description": "Skip version-only updates in workflow files. Managed workflows (smyklot-pr-commands, smyklot-poll) are still synced unless their respective workflow flags are disabled",
           "type": "boolean"
         }
       },
@@ -941,12 +941,12 @@
       "properties": {
         "poll_reactions": {
           "default": true,
-          "description": "Sync poll-reactions workflow. Default: true",
+          "description": "Sync smyklot-poll workflow. Default: true",
           "type": "boolean"
         },
         "pr_commands": {
           "default": true,
-          "description": "Sync pr-commands workflow. Default: true",
+          "description": "Sync smyklot-pr-commands workflow. Default: true",
           "type": "boolean"
         }
       },
