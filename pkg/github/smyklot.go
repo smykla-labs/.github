@@ -19,13 +19,15 @@ import (
 const (
 	smyklotBranchPrefix = "chore/sync-smyklot"
 	smyklotPRLabel      = "ci/skip-all"
+
+	// Workflow template names
+	WorkflowPrCommands    = "pr-commands"
+	WorkflowPollReactions = "poll-reactions"
 )
 
 // SmyklotSyncStats tracks smyklot sync statistics.
 type SmyklotSyncStats struct {
-	Updated          int
 	Skipped          int
-	UpdatedFiles     []string
 	Installed        int
 	InstalledFiles   []string
 	Replaced         int
@@ -95,7 +97,7 @@ func SyncSmyklot(
 
 	var changes []FileChange
 
-	workflowNames := []string{"pr-commands", "poll-reactions"}
+	workflowNames := []string{WorkflowPrCommands, WorkflowPollReactions}
 
 	for _, workflowName := range workflowNames {
 		if !shouldSyncWorkflow(orgConfig, syncConfig, workflowName) {
@@ -186,7 +188,7 @@ func SyncSmyklot(
 		for _, workflowPath := range workflowFiles {
 			// Skip the managed workflow files
 			filename := filepath.Base(workflowPath)
-			if filename == "pr-commands.yml" || filename == "poll-reactions.yml" {
+			if filename == WorkflowPrCommands+".yml" || filename == WorkflowPollReactions+".yml" {
 				continue
 			}
 
@@ -204,7 +206,6 @@ func SyncSmyklot(
 		"installed", stats.Installed,
 		"replaced", stats.Replaced,
 		"version_only", stats.VersionOnly,
-		"updated", stats.Updated,
 		"skipped", stats.Skipped,
 	)
 
@@ -571,15 +572,6 @@ func buildSmyklotPRBody(tag string, stats *SmyklotSyncStats) string {
 		}
 	}
 
-	// Legacy files updated section (for backward compatibility)
-	if len(stats.UpdatedFiles) > 0 {
-		body.WriteString("\n## Files Updated\n\n")
-
-		for _, file := range stats.UpdatedFiles {
-			body.WriteString(fmt.Sprintf("- `%s`\n", file))
-		}
-	}
-
 	body.WriteString("\n---\n\n")
 	body.WriteString("*This PR was automatically created by the smyklot sync workflow*\n")
 
@@ -588,39 +580,11 @@ func buildSmyklotPRBody(tag string, stats *SmyklotSyncStats) string {
 
 // logSmyklotChanges logs the planned smyklot changes in dry-run mode.
 func logSmyklotChanges(log *logger.Logger, stats *SmyklotSyncStats) {
-	if len(stats.InstalledFiles) > 0 {
-		log.Info("workflows to install:")
+	logFilesWithPrefix(log, "workflows to install:", "+", stats.InstalledFiles)
+	logFilesWithPrefix(log, "workflows to replace:", "~", stats.ReplacedFiles)
+	logFilesWithPrefix(log, "workflows with version-only updates:", "v", stats.VersionOnlyFiles)
 
-		for _, file := range stats.InstalledFiles {
-			log.Info("  + " + file)
-		}
-	}
-
-	if len(stats.ReplacedFiles) > 0 {
-		log.Info("workflows to replace:")
-
-		for _, file := range stats.ReplacedFiles {
-			log.Info("  ~ " + file)
-		}
-	}
-
-	if len(stats.VersionOnlyFiles) > 0 {
-		log.Info("workflows with version-only updates:")
-
-		for _, file := range stats.VersionOnlyFiles {
-			log.Info("  v " + file)
-		}
-	}
-
-	if len(stats.UpdatedFiles) > 0 {
-		log.Info("files to update:")
-
-		for _, file := range stats.UpdatedFiles {
-			log.Info("  ~ " + file)
-		}
-	}
-
-	if stats.Installed+stats.Replaced+stats.VersionOnly+stats.Updated == 0 {
+	if stats.Installed+stats.Replaced+stats.VersionOnly == 0 {
 		log.Info("no smyklot changes needed")
 	}
 }
@@ -720,9 +684,9 @@ func shouldSyncWorkflow(
 	var orgEnabled *bool
 
 	switch workflowName {
-	case "pr-commands":
+	case WorkflowPrCommands:
 		orgEnabled = orgConfig.Workflows.PrCommands
-	case "poll-reactions":
+	case WorkflowPollReactions:
 		orgEnabled = orgConfig.Workflows.PollReactions
 	default:
 		return false
@@ -732,9 +696,9 @@ func shouldSyncWorkflow(
 	var repoEnabled *bool
 
 	switch workflowName {
-	case "pr-commands":
+	case WorkflowPrCommands:
 		repoEnabled = repoConfig.Sync.Smyklot.Workflows.PrCommands
-	case "poll-reactions":
+	case WorkflowPollReactions:
 		repoEnabled = repoConfig.Sync.Smyklot.Workflows.PollReactions
 	}
 

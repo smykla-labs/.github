@@ -1136,31 +1136,24 @@ mutation($prId: ID!) {
 
 // logFileChanges logs the planned file changes in dry-run mode.
 func logFileChanges(log *logger.Logger, stats *FileSyncStats) {
-	if len(stats.CreatedFiles) > 0 {
-		log.Info("files to create:")
-
-		for _, file := range stats.CreatedFiles {
-			log.Info("  + " + file)
-		}
-	}
-
-	if len(stats.UpdatedFiles) > 0 {
-		log.Info("files to update:")
-
-		for _, file := range stats.UpdatedFiles {
-			log.Info("  ~ " + file)
-		}
-	}
-
-	if len(stats.DeletedFiles) > 0 {
-		log.Info("files to delete:")
-
-		for _, file := range stats.DeletedFiles {
-			log.Info("  - " + file)
-		}
-	}
+	logFilesWithPrefix(log, "files to create:", "+", stats.CreatedFiles)
+	logFilesWithPrefix(log, "files to update:", "~", stats.UpdatedFiles)
+	logFilesWithPrefix(log, "files to delete:", "-", stats.DeletedFiles)
 
 	if stats.Created+stats.Updated+stats.Deleted == 0 {
 		log.Info("no file changes needed")
+	}
+}
+
+// logFilesWithPrefix logs a list of files with a header and prefix symbol.
+func logFilesWithPrefix(log *logger.Logger, header string, prefix string, files []string) {
+	if len(files) == 0 {
+		return
+	}
+
+	log.Info(header)
+
+	for _, file := range files {
+		log.Info("  " + prefix + " " + file)
 	}
 }

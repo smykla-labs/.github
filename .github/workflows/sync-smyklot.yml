@@ -31,15 +31,28 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Validate smyklot configuration
+        env:
+          SMYKLOT_APP_ID: ${{ vars.SMYKLOT_APP_ID }}
+          SMYKLOT_APP_PRIVATE_KEY: ${{ secrets.SMYKLOT_APP_PRIVATE_KEY }}
         run: |
-          if [ -z "${{ vars.SMYKLOT_APP_ID }}" ]; then
-            echo "::error::SMYKLOT_APP_ID variable is not set"
+          errors=()
+
+          if [[ -z "$SMYKLOT_APP_ID" ]]; then
+            errors+=("SMYKLOT_APP_ID variable is not set")
+          fi
+
+          if [[ -z "$SMYKLOT_APP_PRIVATE_KEY" ]]; then
+            errors+=("SMYKLOT_APP_PRIVATE_KEY secret is missing or empty")
+          fi
+
+          if [[ ${#errors[@]} -gt 0 ]]; then
+            for error in "${errors[@]}"; do
+              echo "::error::$error"
+            done
             exit 1
           fi
-          if [ -z "${{ secrets.SMYKLOT_APP_PRIVATE_KEY }}" ]; then
-            echo "::error::SMYKLOT_APP_PRIVATE_KEY secret is not set"
-            exit 1
-          fi
+
+          echo "✅ Smyklot configuration validated"
 
   get-repos:
     needs: validate

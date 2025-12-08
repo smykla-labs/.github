@@ -431,4 +431,14 @@ func (sf *SmyklotFile) SetDefaults() {
 		val := true
 		sf.SyncVersion = &val
 	}
+
+	if sf.Workflows.PrCommands == nil {
+		val := true
+		sf.Workflows.PrCommands = &val
+	}
+
+	if sf.Workflows.PollReactions == nil {
+		val := true
+		sf.Workflows.PollReactions = &val
+	}
 }
