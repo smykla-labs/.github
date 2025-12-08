@@ -33,10 +33,10 @@ templates/                  # Source files for file sync (auto-discovered)
 
 **Architecture**: Go CLI (`dotsync`) → container (`ghcr.io/smykla-labs/dotsync`) → composite action
 
-**Unified Action** (`.github/actions/dotsync/action.yml`):
+**Unified Action** (`action.yml` in repository root):
 
 ```yaml
-- uses: ./.github/actions/dotsync
+- uses: ./
   with:
     command: labels|files|settings|smyklot|repos|config
     subcommand: sync|discover|list|verify

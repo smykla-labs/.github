@@ -246,7 +246,7 @@ jobs:
           ref: refs/heads/main
           files: |
             CHANGELOG.md
-            .github/actions/dotsync/action.yml
+            action.yml
           message: ${{ steps.commit-msg.outputs.message }}
           auto-stage: true
           update-local: true
