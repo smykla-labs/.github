@@ -88,7 +88,7 @@ func SyncSmyklot(
 	// Version-only sync for other workflows if enabled
 	changes = append(changes, syncVersionOnlyWorkflows(
 		ctx, log, client, org, repo, version, tag,
-		orgConfig, workflowFiles, stats,
+		orgConfig, syncConfig, workflowFiles, stats,
 	)...)
 
 	// Log stats
@@ -371,9 +371,18 @@ func syncVersionOnlyWorkflows(
 	version string,
 	tag string,
 	orgConfig *configtypes.SmyklotFile,
+	syncConfig *configtypes.SyncConfig,
 	workflowFiles []string,
 	stats *SmyklotSyncStats,
 ) []FileChange {
+	// Check repo-level version skip first
+	if syncConfig.Sync.Smyklot.Version.Skip {
+		log.Debug("version-only sync skipped by repo config (sync.smyklot.version.skip=true)")
+
+		return nil
+	}
+
+	// Check org-level sync_version setting
 	if orgConfig.SyncVersion == nil || !*orgConfig.SyncVersion || len(workflowFiles) == 0 {
 		return nil
 	}
@@ -602,7 +611,7 @@ func upsertSmyklotPullRequest(
 	tag string,
 	stats *SmyklotSyncStats,
 ) (int, error) {
-	prTitle := "chore(deps): update smyklot to " + tag
+	prTitle := buildSmyklotPRTitle(tag, stats)
 	prBody := buildSmyklotPRBody(tag, stats)
 
 	// Check for existing PR
@@ -676,15 +685,57 @@ func finalizeSmyklotPR(
 	return nil
 }
 
+// buildSmyklotPRTitle builds the PR title based on what changes are included.
+func buildSmyklotPRTitle(tag string, stats *SmyklotSyncStats) string {
+	hasWorkflowChanges := stats.Installed > 0 || stats.Replaced > 0
+	hasVersionChanges := stats.VersionOnly > 0
+
+	switch {
+	case hasVersionChanges && hasWorkflowChanges:
+		// Both version and workflow changes - emphasize version update
+		return "chore(deps): update smyklot to " + tag
+
+	case hasVersionChanges:
+		// Version-only changes
+		return "chore(deps): update smyklot to " + tag
+
+	case hasWorkflowChanges:
+		// Workflow-only changes (no version bump in other files)
+		return "chore(sync): sync smyklot workflows"
+
+	default:
+		// Fallback (shouldn't happen if we have changes)
+		return "chore(sync): sync smyklot"
+	}
+}
+
 // buildSmyklotPRBody builds the PR body text for smyklot sync.
 func buildSmyklotPRBody(tag string, stats *SmyklotSyncStats) string {
 	var body strings.Builder
 
-	body.WriteString(fmt.Sprintf(
-		"Updates [`smykla-labs/smyklot`](https://github.com/smykla-labs/smyklot) "+
-			"to version [`%s`](https://github.com/smykla-labs/smyklot/releases/tag/%s).\n",
-		tag, tag,
-	))
+	hasWorkflowChanges := stats.Installed > 0 || stats.Replaced > 0
+	hasVersionChanges := stats.VersionOnly > 0
+
+	switch {
+	case hasVersionChanges:
+		// Version changes present - mention the update
+		body.WriteString(fmt.Sprintf(
+			"Updates [`smykla-labs/smyklot`](https://github.com/smykla-labs/smyklot) "+
+				"to version [`%s`](https://github.com/smykla-labs/smyklot/releases/tag/%s).\n",
+			tag, tag,
+		))
+
+	case hasWorkflowChanges:
+		// Workflow-only changes
+		body.WriteString(fmt.Sprintf(
+			"Syncs smyklot workflow files from "+
+				"[`smykla-labs/smyklot@%s`](https://github.com/smykla-labs/smyklot/releases/tag/%s).\n",
+			tag, tag,
+		))
+
+	default:
+		body.WriteString("Syncs smyklot configuration.\n")
+	}
 
 	// Workflows installed section
 	if len(stats.InstalledFiles) > 0 {

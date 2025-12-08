@@ -909,12 +909,28 @@
       "properties": {
         "skip": {
           "default": false,
-          "description": "Skip smyklot version synchronization only. Label and file sync still run unless their respective skip flags are set. Use this for repos that don't use smyklot or manage their own versions",
+          "description": "Skip ALL smyklot synchronization (both workflows and version updates). Label and file sync still run unless their respective skip flags are set. Use this for repos that don't use smyklot at all",
           "type": "boolean"
+        },
+        "version": {
+          "$ref": "#/$defs/SmyklotVersionConfig",
+          "description": "Version synchronization configuration"
         },
         "workflows": {
           "$ref": "#/$defs/SmyklotWorkflowsConfig",
           "description": "Which smyklot workflows to sync to this repository. Allows per-repo control over workflow installation"
+        }
+      },
+      "type": "object"
+    },
+    "SmyklotVersionConfig": {
+      "additionalProperties": false,
+      "description": "Controls version-only updates in non-managed workflow files",
+      "properties": {
+        "skip": {
+          "default": false,
+          "description": "Skip version-only updates in workflow files. Managed workflows (pr-commands, poll-reactions) are still synced unless their respective workflow flags are disabled",
+          "type": "boolean"
         }
       },
       "type": "object"
