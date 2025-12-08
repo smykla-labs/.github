@@ -1,5 +1,5 @@
 ---
-name: Verify Schema
+name: Verify Schemas
 
 on:
   pull_request:
