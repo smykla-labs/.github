@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.9.2](https://github.com/smykla-labs/.github/compare/dotsync/v1.9.1...dotsync/v1.9.2) (2025-12-08)
+
+### Bug Fixes
+
+* **sync:** fix summary and ruleset validation ([9724505](https://github.com/smykla-labs/.github/commit/972450599ae2a4c0971f7bc03f19e3d6608f73c6))
+
 ## [1.9.1](https://github.com/smykla-labs/.github/compare/dotsync/v1.9.0...dotsync/v1.9.1) (2025-12-08)
 
 ### Bug Fixes
