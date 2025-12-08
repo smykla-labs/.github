@@ -97,7 +97,7 @@ const (
 )
 
 // Controls automatic updates of smyklot version references in workflow files when new versions
-// are released
+// are released, and which workflows to install/sync
 //
 //nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type SmyklotConfig struct {
@@ -105,6 +105,19 @@ type SmyklotConfig struct {
 	// respective skip flags are set. Use this for repos that don't use smyklot or manage their
 	// own versions
 	Skip bool `json:"skip" jsonschema:"default=false" yaml:"skip"`
+	// Which smyklot workflows to sync to this repository. Allows per-repo control over workflow
+	// installation
+	Workflows SmyklotWorkflowsConfig `json:"workflows" yaml:"workflows"`
+}
+
+// Controls which smyklot workflows are synced to a repository
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
+type SmyklotWorkflowsConfig struct {
+	// Sync pr-commands workflow. Default: true
+	PrCommands *bool `json:"pr_commands" jsonschema:"default=true" yaml:"pr_commands"`
+	// Sync poll-reactions workflow. Default: true
+	PollReactions *bool `json:"poll_reactions" jsonschema:"default=true" yaml:"poll_reactions"`
 }
 
 // Controls synchronization of GitHub repository settings like merge strategies, branch
@@ -399,4 +412,33 @@ type CodeScanningToolConfig struct {
 	AlertsThreshold string `json:"alerts_threshold" jsonschema:"enum=none,enum=errors,enum=errors_and_warnings,enum=all,required" yaml:"alerts_threshold"`
 	// Security alert threshold level (none, critical, high_or_higher, medium_or_higher, all)
 	SecurityAlertsThreshold string `json:"security_alerts_threshold" jsonschema:"enum=none,enum=critical,enum=high_or_higher,enum=medium_or_higher,enum=all,required" yaml:"security_alerts_threshold"`
+}
+
+// Organization-wide smyklot configuration file controlling version sync and workflow
+// installation across all repositories
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
+type SmyklotFile struct {
+	// Whether to sync version references in existing workflows. Default: true
+	SyncVersion *bool `json:"sync_version" jsonschema:"default=true" yaml:"sync_version"`
+	// Which workflows to sync to all repositories by default
+	Workflows SmyklotWorkflowsConfig `json:"workflows" yaml:"workflows"`
+}
+
+// SetDefaults sets default values for SmyklotFile fields if they are nil.
+func (sf *SmyklotFile) SetDefaults() {
+	if sf.SyncVersion == nil {
+		val := true
+		sf.SyncVersion = &val
+	}
+
+	if sf.Workflows.PrCommands == nil {
+		val := true
+		sf.Workflows.PrCommands = &val
+	}
+
+	if sf.Workflows.PollReactions == nil {
+		val := true
+		sf.Workflows.PollReactions = &val
+	}
 }

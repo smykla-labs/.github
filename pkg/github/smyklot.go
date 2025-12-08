@@ -3,11 +3,14 @@ package github
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/cockroachdb/errors"
 	"github.com/google/go-github/v80/github"
+	"gopkg.in/yaml.v3"
 
 	"github.com/smykla-labs/.github/internal/configtypes"
 	"github.com/smykla-labs/.github/pkg/logger"
@@ -16,16 +19,26 @@ import (
 const (
 	smyklotBranchPrefix = "chore/sync-smyklot"
 	smyklotPRLabel      = "ci/skip-all"
+
+	// Workflow template names
+	WorkflowPrCommands    = "pr-commands"
+	WorkflowPollReactions = "poll-reactions"
 )
 
 // SmyklotSyncStats tracks smyklot sync statistics.
 type SmyklotSyncStats struct {
-	Updated      int
-	Skipped      int
-	UpdatedFiles []string
+	Skipped          int
+	Installed        int
+	InstalledFiles   []string
+	Replaced         int
+	ReplacedFiles    []string
+	VersionOnly      int
+	VersionOnlyFiles []string
 }
 
-// SyncSmyklot synchronizes smyklot version references in workflow files.
+// SyncSmyklot synchronizes smyklot workflows and version references.
+//
+//nolint:gocognit,nestif,funlen // complexity from workflow template sync logic
 func SyncSmyklot(
 	ctx context.Context,
 	log *logger.Logger,
@@ -34,7 +47,10 @@ func SyncSmyklot(
 	repo string,
 	version string,
 	tag string,
+	sha string,
 	syncConfig *configtypes.SyncConfig,
+	templatesDir string,
+	smyklotFilePath string,
 	dryRun bool,
 ) error {
 	// Check if sync is skipped
@@ -50,43 +66,146 @@ func SyncSmyklot(
 		return nil
 	}
 
+	// Fetch org-level smyklot config
+	orgConfig, err := fetchSmyklotOrgConfig(ctx, client, org, smyklotFilePath)
+	if err != nil {
+		return errors.Wrap(err, "fetching org smyklot config")
+	}
+
 	// Get repository info
 	defaultBranch, baseSHA, err := getRepoBaseInfo(ctx, log, client, org, repo)
 	if err != nil {
 		return errors.Wrap(err, "getting repository base info")
 	}
 
-	// List workflow files
+	// List existing workflow files
 	workflowFiles, err := listWorkflowFiles(ctx, log, client, org, repo)
 	if err != nil {
 		return errors.Wrap(err, "listing workflow files")
 	}
 
-	if len(workflowFiles) == 0 {
-		log.Info("no workflow files found")
+	// Create a map of existing workflows for quick lookup
+	existingWorkflows := make(map[string]bool)
 
-		return nil
+	for _, path := range workflowFiles {
+		filename := filepath.Base(path)
+		existingWorkflows[filename] = true
 	}
 
-	log.Debug("found workflow files", "count", len(workflowFiles))
-
-	// Process workflow files
+	// Process workflow templates
 	stats := &SmyklotSyncStats{}
 
 	var changes []FileChange
 
-	for _, workflowPath := range workflowFiles {
-		change, processed := processWorkflowFile(
-			ctx, log, client, org, repo, workflowPath, version, tag, stats,
-		)
-		if processed {
-			changes = append(changes, change)
+	workflowNames := []string{WorkflowPrCommands, WorkflowPollReactions}
+
+	for _, workflowName := range workflowNames {
+		if !shouldSyncWorkflow(orgConfig, syncConfig, workflowName) {
+			log.Debug("workflow sync disabled by config", "workflow", workflowName)
+
+			continue
+		}
+
+		// Read and render template
+		templateContent, err := readWorkflowTemplate(templatesDir, workflowName)
+		if err != nil {
+			log.Warn("failed to read workflow template", "workflow", workflowName, "error", err)
+
+			continue
+		}
+
+		expectedContent := renderWorkflowTemplate(templateContent, tag, sha)
+		workflowPath := ".github/workflows/" + workflowName + ".yml"
+
+		// Check if workflow already exists
+		if existingWorkflows[workflowName+".yml"] {
+			// Fetch existing workflow
+			fileContent, _, _, fetchErr := client.Repositories.GetContents(
+				ctx, org, repo, workflowPath, nil,
+			)
+			if fetchErr != nil {
+				log.Warn(
+					"failed to fetch existing workflow",
+					"path",
+					workflowPath,
+					"error",
+					fetchErr,
+				)
+
+				continue
+			}
+
+			existingContent, decodeErr := fileContent.GetContent()
+			if decodeErr != nil {
+				log.Warn(
+					"failed to decode existing workflow",
+					"path",
+					workflowPath,
+					"error",
+					decodeErr,
+				)
+
+				continue
+			}
+
+			// Compare content
+			if existingContent != string(expectedContent) {
+				log.Debug("workflow differs from template, will replace",
+					"workflow", workflowName)
+
+				stats.Replaced++
+				stats.ReplacedFiles = append(stats.ReplacedFiles, workflowPath)
+
+				changes = append(changes, FileChange{
+					Path:    workflowPath,
+					Content: expectedContent,
+					Action:  "update",
+				})
+			} else {
+				log.Debug("workflow matches template", "workflow", workflowName)
+
+				stats.Skipped++
+			}
+		} else {
+			// Workflow doesn't exist, install it
+			log.Debug("workflow not found, will install", "workflow", workflowName)
+
+			stats.Installed++
+			stats.InstalledFiles = append(stats.InstalledFiles, workflowPath)
+
+			changes = append(changes, FileChange{
+				Path:    workflowPath,
+				Content: expectedContent,
+				Action:  "create",
+			})
+		}
+	}
+
+	// Version-only sync for other workflows if enabled
+	if orgConfig.SyncVersion != nil && *orgConfig.SyncVersion && len(workflowFiles) > 0 {
+		log.Debug("checking for version-only updates")
+
+		for _, workflowPath := range workflowFiles {
+			// Skip the managed workflow files
+			filename := filepath.Base(workflowPath)
+			if filename == WorkflowPrCommands+".yml" || filename == WorkflowPollReactions+".yml" {
+				continue
+			}
+
+			change, processed := processWorkflowFile(
+				ctx, log, client, org, repo, workflowPath, version, tag, stats,
+			)
+			if processed {
+				changes = append(changes, change)
+			}
 		}
 	}
 
 	// Log stats
 	log.Info("smyklot sync summary",
-		"updated", stats.Updated,
+		"installed", stats.Installed,
+		"replaced", stats.Replaced,
+		"version_only", stats.VersionOnly,
 		"skipped", stats.Skipped,
 	)
 
@@ -217,8 +336,8 @@ func processWorkflowFile(
 
 	log.Debug("found outdated smyklot references", "file", workflowPath)
 
-	stats.Updated++
-	stats.UpdatedFiles = append(stats.UpdatedFiles, workflowPath)
+	stats.VersionOnly++
+	stats.VersionOnlyFiles = append(stats.VersionOnlyFiles, workflowPath)
 
 	return FileChange{
 		Path:    workflowPath,
@@ -426,11 +545,29 @@ func buildSmyklotPRBody(tag string, stats *SmyklotSyncStats) string {
 		tag, tag,
 	))
 
-	// Files updated section
-	if len(stats.UpdatedFiles) > 0 {
-		body.WriteString("\n## Files Updated\n\n")
+	// Workflows installed section
+	if len(stats.InstalledFiles) > 0 {
+		body.WriteString("\n## Workflows Installed\n\n")
 
-		for _, file := range stats.UpdatedFiles {
+		for _, file := range stats.InstalledFiles {
+			body.WriteString(fmt.Sprintf("- `%s`\n", file))
+		}
+	}
+
+	// Workflows replaced section
+	if len(stats.ReplacedFiles) > 0 {
+		body.WriteString("\n## Workflows Replaced\n\n")
+
+		for _, file := range stats.ReplacedFiles {
+			body.WriteString(fmt.Sprintf("- `%s`\n", file))
+		}
+	}
+
+	// Version-only updates section
+	if len(stats.VersionOnlyFiles) > 0 {
+		body.WriteString("\n## Version Updates\n\n")
+
+		for _, file := range stats.VersionOnlyFiles {
 			body.WriteString(fmt.Sprintf("- `%s`\n", file))
 		}
 	}
@@ -443,15 +580,143 @@ func buildSmyklotPRBody(tag string, stats *SmyklotSyncStats) string {
 
 // logSmyklotChanges logs the planned smyklot changes in dry-run mode.
 func logSmyklotChanges(log *logger.Logger, stats *SmyklotSyncStats) {
-	if len(stats.UpdatedFiles) > 0 {
-		log.Info("files to update:")
+	logFilesWithPrefix(log, "workflows to install:", "+", stats.InstalledFiles)
+	logFilesWithPrefix(log, "workflows to replace:", "~", stats.ReplacedFiles)
+	logFilesWithPrefix(log, "workflows with version-only updates:", "v", stats.VersionOnlyFiles)
 
-		for _, file := range stats.UpdatedFiles {
-			log.Info("  ~ " + file)
-		}
-	}
-
-	if stats.Updated == 0 {
+	if stats.Installed+stats.Replaced+stats.VersionOnly == 0 {
 		log.Info("no smyklot changes needed")
 	}
+}
+
+// readWorkflowTemplate reads a workflow template from the templates directory.
+func readWorkflowTemplate(templatesDir string, name string) ([]byte, error) {
+	templatePath := filepath.Join(templatesDir, name+".yml")
+
+	//nolint:gosec // templatesDir is from CLI flag, name is from controlled list
+	content, err := os.ReadFile(templatePath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "reading template %s", templatePath)
+	}
+
+	return content, nil
+}
+
+// renderWorkflowTemplate replaces {{TAG}} and {{SHA}} placeholders in a template.
+func renderWorkflowTemplate(content []byte, tag string, sha string) []byte {
+	rendered := string(content)
+	rendered = strings.ReplaceAll(rendered, "{{TAG}}", tag)
+	rendered = strings.ReplaceAll(rendered, "{{SHA}}", sha)
+
+	return []byte(rendered)
+}
+
+// fetchSmyklotOrgConfig fetches the org-level smyklot config from .github repo.
+func fetchSmyklotOrgConfig(
+	ctx context.Context,
+	client *Client,
+	org string,
+	smyklotFilePath string,
+) (*configtypes.SmyklotFile, error) {
+	// If smyklotFilePath is provided (local file), read from filesystem
+	if smyklotFilePath != "" {
+		//nolint:gosec // smyklotFilePath is from CLI flag
+		content, err := os.ReadFile(smyklotFilePath)
+		if err != nil {
+			return nil, errors.Wrapf(err, "reading smyklot config from %s", smyklotFilePath)
+		}
+
+		var config configtypes.SmyklotFile
+		if err := yaml.Unmarshal(content, &config); err != nil {
+			return nil, errors.Wrap(err, "parsing smyklot config")
+		}
+
+		config.SetDefaults()
+
+		return &config, nil
+	}
+
+	// Otherwise fetch from .github repository
+	fileContent, _, _, err := client.Repositories.GetContents(
+		ctx,
+		org,
+		".github",
+		".github/smyklot.yml",
+		nil,
+	)
+	if err != nil {
+		if isNotFoundError(err) {
+			// Return default config if file doesn't exist
+			return &configtypes.SmyklotFile{
+				SyncVersion: boolPtr(true),
+				Workflows: configtypes.SmyklotWorkflowsConfig{
+					PrCommands:    boolPtr(true),
+					PollReactions: boolPtr(true),
+				},
+			}, nil
+		}
+
+		return nil, errors.Wrap(err, "fetching smyklot org config")
+	}
+
+	content, err := fileContent.GetContent()
+	if err != nil {
+		return nil, errors.Wrap(err, "decoding smyklot org config")
+	}
+
+	var config configtypes.SmyklotFile
+	if err := yaml.Unmarshal([]byte(content), &config); err != nil {
+		return nil, errors.Wrap(err, "parsing smyklot org config")
+	}
+
+	config.SetDefaults()
+
+	return &config, nil
+}
+
+// shouldSyncWorkflow determines if a workflow should be synced based on org and repo config.
+func shouldSyncWorkflow(
+	orgConfig *configtypes.SmyklotFile,
+	repoConfig *configtypes.SyncConfig,
+	workflowName string,
+) bool {
+	// Get the workflow setting from org config
+	var orgEnabled *bool
+
+	switch workflowName {
+	case WorkflowPrCommands:
+		orgEnabled = orgConfig.Workflows.PrCommands
+	case WorkflowPollReactions:
+		orgEnabled = orgConfig.Workflows.PollReactions
+	default:
+		return false
+	}
+
+	// Get repo override if it exists
+	var repoEnabled *bool
+
+	switch workflowName {
+	case WorkflowPrCommands:
+		repoEnabled = repoConfig.Sync.Smyklot.Workflows.PrCommands
+	case WorkflowPollReactions:
+		repoEnabled = repoConfig.Sync.Smyklot.Workflows.PollReactions
+	}
+
+	// Repo config takes precedence
+	if repoEnabled != nil {
+		return *repoEnabled
+	}
+
+	// Fall back to org config
+	if orgEnabled != nil {
+		return *orgEnabled
+	}
+
+	// Default to true
+	return true
+}
+
+// boolPtr returns a pointer to a bool value.
+func boolPtr(b bool) *bool {
+	return &b
 }

@@ -1,0 +1,42 @@
+{
+  "$defs": {
+    "SmyklotFile": {
+      "additionalProperties": false,
+      "description": "Organization-wide smyklot configuration file controlling version sync and workflow installation across all repositories",
+      "properties": {
+        "sync_version": {
+          "default": true,
+          "description": "Whether to sync version references in existing workflows. Default: true",
+          "type": "boolean"
+        },
+        "workflows": {
+          "$ref": "#/$defs/SmyklotWorkflowsConfig",
+          "description": "Which workflows to sync to all repositories by default"
+        }
+      },
+      "type": "object"
+    },
+    "SmyklotWorkflowsConfig": {
+      "additionalProperties": false,
+      "description": "Controls which smyklot workflows are synced to a repository",
+      "properties": {
+        "poll_reactions": {
+          "default": true,
+          "description": "Sync poll-reactions workflow. Default: true",
+          "type": "boolean"
+        },
+        "pr_commands": {
+          "default": true,
+          "description": "Sync pr-commands workflow. Default: true",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/smykla-labs/.github/main/schemas/smyklot.schema.json",
+  "$ref": "#/$defs/SmyklotFile",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Organization-wide smyklot configuration controlling version sync and workflow installation. Place at .github/smyklot.yml in the .github repository.",
+  "title": "Smyklot Configuration"
+}
