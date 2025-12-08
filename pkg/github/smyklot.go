@@ -93,16 +93,24 @@ func SyncSmyklot(
 	// Process workflow templates
 	stats := &SmyklotSyncStats{}
 
-	changes := syncManagedWorkflows(
+	changes, err := syncManagedWorkflows(
 		ctx, log, client, org, repo, tag, sha,
 		orgConfig, syncConfig, templatesDir, existingWorkflows, stats,
 	)
+	if err != nil {
+		return errors.Wrap(err, "syncing managed workflows")
+	}
 
 	// Version-only sync for other workflows if enabled
-	changes = append(changes, syncVersionOnlyWorkflows(
+	versionChanges, err := syncVersionOnlyWorkflows(
 		ctx, log, client, org, repo, version, tag,
 		orgConfig, syncConfig, workflowFiles, stats,
-	)...)
+	)
+	if err != nil {
+		return errors.Wrap(err, "syncing version-only workflows")
+	}
+
+	changes = append(changes, versionChanges...)
 
 	// Log stats
 	log.Info("smyklot sync summary",
@@ -207,7 +215,7 @@ func syncManagedWorkflows(
 	templatesDir string,
 	existingWorkflows map[string]string,
 	stats *SmyklotSyncStats,
-) []FileChange {
+) ([]FileChange, error) {
 	var changes []FileChange
 
 	workflowNames := []string{WorkflowPrCommands, WorkflowPoll}
@@ -219,14 +227,18 @@ func syncManagedWorkflows(
 			continue
 		}
 
-		workflowChanges := syncSingleManagedWorkflow(
+		workflowChanges, err := syncSingleManagedWorkflow(
 			ctx, log, client, org, repo, workflowName, tag, sha,
 			templatesDir, existingWorkflows, stats,
 		)
+		if err != nil {
+			return nil, errors.Wrapf(err, "syncing workflow %s", workflowName)
+		}
+
 		changes = append(changes, workflowChanges...)
 	}
 
-	return changes
+	return changes, nil
 }
 
 // syncSingleManagedWorkflow syncs a single managed workflow template.
@@ -242,12 +254,10 @@ func syncSingleManagedWorkflow(
 	templatesDir string,
 	existingWorkflows map[string]string,
 	stats *SmyklotSyncStats,
-) []FileChange {
+) ([]FileChange, error) {
 	templateContent, err := readWorkflowTemplate(templatesDir, workflowName)
 	if err != nil {
-		log.Warn("failed to read workflow template", "workflow", workflowName, "error", err)
-
-		return nil
+		return nil, errors.Wrapf(err, "reading workflow template %s", workflowName)
 	}
 
 	expectedContent := renderWorkflowTemplate(templateContent, tag, sha)
@@ -256,14 +266,19 @@ func syncSingleManagedWorkflow(
 
 	// Check for legacy workflow name if current doesn't exist
 	if !exists {
-		if legacyChanges := handleLegacyWorkflow(
+		legacyChanges, legacyErr := handleLegacyWorkflow(
 			ctx, log, client, org, repo, workflowName, targetPath,
 			expectedContent, existingWorkflows, stats,
-		); legacyChanges != nil {
-			return legacyChanges
+		)
+		if legacyErr != nil {
+			return nil, legacyErr
 		}
 
-		return handleNewWorkflow(log, workflowName, targetPath, expectedContent, stats)
+		if legacyChanges != nil {
+			return legacyChanges, nil
+		}
+
+		return handleNewWorkflow(log, workflowName, targetPath, expectedContent, stats), nil
 	}
 
 	return handleExistingWorkflow(
@@ -293,7 +308,7 @@ func handleNewWorkflow(
 }
 
 // handleLegacyWorkflow checks for and migrates legacy-named workflows.
-// Returns nil if no legacy workflow found or if it's not smyklot-managed.
+// Returns (nil, nil) if no legacy workflow found or if it's not smyklot-managed.
 func handleLegacyWorkflow(
 	ctx context.Context,
 	log *logger.Logger,
@@ -305,15 +320,15 @@ func handleLegacyWorkflow(
 	expectedContent []byte,
 	existingWorkflows map[string]string,
 	stats *SmyklotSyncStats,
-) []FileChange {
+) ([]FileChange, error) {
 	legacyName, hasLegacy := legacyWorkflowNames[workflowName]
 	if !hasLegacy {
-		return nil
+		return nil, nil
 	}
 
 	legacyPath, legacyExists := existingWorkflows[legacyName]
 	if !legacyExists {
-		return nil
+		return nil, nil
 	}
 
 	log.Debug("found legacy workflow", "legacy", legacyName, "current", workflowName)
@@ -321,25 +336,19 @@ func handleLegacyWorkflow(
 	// Fetch legacy workflow content to verify it's smyklot-managed
 	fileContent, _, _, err := client.Repositories.GetContents(ctx, org, repo, legacyPath, nil)
 	if err != nil {
-		log.Warn("failed to fetch legacy workflow content",
-			"path", legacyPath, "error", err)
-
-		return nil
+		return nil, errors.Wrapf(err, "fetching legacy workflow content from %s", legacyPath)
 	}
 
 	legacyContent, err := fileContent.GetContent()
 	if err != nil {
-		log.Warn("failed to decode legacy workflow content",
-			"path", legacyPath, "error", err)
-
-		return nil
+		return nil, errors.Wrapf(err, "decoding legacy workflow content from %s", legacyPath)
 	}
 
 	if !strings.Contains(legacyContent, smyklotManagedHeader) {
 		log.Info("legacy workflow exists but is not smyklot-managed, skipping migration",
 			"path", legacyPath)
 
-		return nil
+		return nil, nil
 	}
 
 	log.Info("migrating legacy workflow to new name",
@@ -358,7 +367,7 @@ func handleLegacyWorkflow(
 			Content: expectedContent,
 			Action:  "create",
 		},
-	}
+	}, nil
 }
 
 // handleExistingWorkflow handles updating an existing workflow.
@@ -373,21 +382,17 @@ func handleExistingWorkflow(
 	targetPath string,
 	expectedContent []byte,
 	stats *SmyklotSyncStats,
-) []FileChange {
+) ([]FileChange, error) {
 	fileContent, _, _, fetchErr := client.Repositories.GetContents(
 		ctx, org, repo, existingPath, nil,
 	)
 	if fetchErr != nil {
-		log.Warn("failed to fetch existing workflow", "path", existingPath, "error", fetchErr)
-
-		return nil
+		return nil, errors.Wrapf(fetchErr, "fetching existing workflow from %s", existingPath)
 	}
 
 	existingContent, decodeErr := fileContent.GetContent()
 	if decodeErr != nil {
-		log.Warn("failed to decode existing workflow", "path", existingPath, "error", decodeErr)
-
-		return nil
+		return nil, errors.Wrapf(decodeErr, "decoding existing workflow from %s", existingPath)
 	}
 
 	needsExtensionFix := strings.HasSuffix(existingPath, ".yaml")
@@ -397,17 +402,17 @@ func handleExistingWorkflow(
 	case needsExtensionFix:
 		return handleExtensionNormalization(
 			log, workflowName, existingPath, targetPath, expectedContent, stats,
-		)
+		), nil
 
 	case !contentMatches:
-		return handleContentUpdate(log, workflowName, targetPath, expectedContent, stats)
+		return handleContentUpdate(log, workflowName, targetPath, expectedContent, stats), nil
 
 	default:
 		log.Debug("workflow matches template", "workflow", workflowName)
 
 		stats.Skipped++
 
-		return nil
+		return nil, nil
 	}
 }
 
@@ -464,17 +469,17 @@ func syncVersionOnlyWorkflows(
 	syncConfig *configtypes.SyncConfig,
 	workflowFiles []string,
 	stats *SmyklotSyncStats,
-) []FileChange {
+) ([]FileChange, error) {
 	// Check repo-level version skip first
 	if syncConfig.Sync.Smyklot.Version.Skip {
 		log.Debug("version-only sync skipped by repo config (sync.smyklot.version.skip=true)")
 
-		return nil
+		return nil, nil
 	}
 
 	// Check org-level sync_version setting
 	if orgConfig.SyncVersion == nil || !*orgConfig.SyncVersion || len(workflowFiles) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	log.Debug("checking for version-only updates")
@@ -487,15 +492,19 @@ func syncVersionOnlyWorkflows(
 			continue
 		}
 
-		change, processed := processWorkflowFile(
+		change, processed, err := processWorkflowFile(
 			ctx, log, client, org, repo, workflowPath, version, tag, stats,
 		)
+		if err != nil {
+			return nil, errors.Wrapf(err, "processing workflow file %s", workflowPath)
+		}
+
 		if processed {
 			changes = append(changes, change)
 		}
 	}
 
-	return changes
+	return changes, nil
 }
 
 // listWorkflowFiles lists all workflow files in .github/workflows directory.
@@ -536,6 +545,8 @@ func listWorkflowFiles(
 }
 
 // processWorkflowFile processes a single workflow file and returns changes.
+// Returns (FileChange{}, false, nil) if no changes needed, (change, true, nil) if changes needed,
+// or (FileChange{}, false, err) if an error occurred.
 func processWorkflowFile(
 	ctx context.Context,
 	log *logger.Logger,
@@ -546,22 +557,18 @@ func processWorkflowFile(
 	version string,
 	tag string,
 	stats *SmyklotSyncStats,
-) (FileChange, bool) {
+) (FileChange, bool, error) {
 	log.Debug("processing workflow file", "path", workflowPath)
 
 	// Fetch file content
 	fileContent, _, _, err := client.Repositories.GetContents(ctx, org, repo, workflowPath, nil)
 	if err != nil {
-		log.Warn("failed to fetch workflow file", "path", workflowPath, "error", err)
-
-		return FileChange{}, false
+		return FileChange{}, false, errors.Wrapf(err, "fetching workflow file %s", workflowPath)
 	}
 
 	content, err := fileContent.GetContent()
 	if err != nil {
-		log.Warn("failed to decode workflow file", "path", workflowPath, "error", err)
-
-		return FileChange{}, false
+		return FileChange{}, false, errors.Wrapf(err, "decoding workflow file %s", workflowPath)
 	}
 
 	// Apply version replacements
@@ -571,7 +578,7 @@ func processWorkflowFile(
 
 		stats.Skipped++
 
-		return FileChange{}, false
+		return FileChange{}, false, nil
 	}
 
 	log.Debug("found outdated smyklot references", "file", workflowPath)
@@ -583,7 +590,7 @@ func processWorkflowFile(
 		Path:    workflowPath,
 		Content: []byte(updatedContent),
 		Action:  "update",
-	}, true
+	}, true, nil
 }
 
 // applyVersionReplacements applies smyklot version replacements to content.
