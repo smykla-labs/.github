@@ -166,7 +166,7 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ matrix.repo.name }}
 
-      - name: Sync smyklot version
+      - name: Sync Smyklot
         uses: ./
         with:
           command: smyklot
