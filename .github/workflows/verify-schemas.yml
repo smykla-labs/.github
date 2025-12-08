@@ -116,10 +116,9 @@ jobs:
           done
 
           # Create tree
-          new_tree=$(gh api "repos/${REPO}/git/trees" \
-            --field base_tree="$base_tree" \
-            --argjson tree "$tree_entries" \
-            --jq '.sha')
+          new_tree=$(jq -n --arg base "$base_tree" --argjson tree "$tree_entries" \
+            '{"base_tree": $base, "tree": $tree}' | \
+            gh api "repos/${REPO}/git/trees" --input - --jq '.sha')
 
           # Create signed commit via API
           commit_msg="chore(schema): regenerate schemas"
