@@ -20,10 +20,23 @@ const (
 	smyklotBranchPrefix = "chore/sync-smyklot"
 	smyklotPRLabel      = "ci/skip-all"
 
-	// Workflow template names
-	WorkflowPrCommands    = "pr-commands"
-	WorkflowPollReactions = "poll-reactions"
+	// Workflow template names (current)
+	WorkflowPrCommands = "smyklot-pr-commands"
+	WorkflowPoll       = "smyklot-poll"
+
+	// Legacy workflow names (for migration)
+	legacyPrCommands    = "pr-commands"
+	legacyPollReactions = "poll-reactions"
+
+	// Header comment that identifies smyklot-managed workflows
+	smyklotManagedHeader = "# This file is managed by smykla-labs/.github org sync."
 )
+
+// legacyWorkflowNames maps current workflow names to their legacy equivalents.
+var legacyWorkflowNames = map[string]string{
+	WorkflowPrCommands: legacyPrCommands,
+	WorkflowPoll:       legacyPollReactions,
+}
 
 // SmyklotSyncStats tracks smyklot sync statistics.
 type SmyklotSyncStats struct {
@@ -88,7 +101,7 @@ func SyncSmyklot(
 	// Version-only sync for other workflows if enabled
 	changes = append(changes, syncVersionOnlyWorkflows(
 		ctx, log, client, org, repo, version, tag,
-		orgConfig, workflowFiles, stats,
+		orgConfig, syncConfig, workflowFiles, stats,
 	)...)
 
 	// Log stats
@@ -197,7 +210,7 @@ func syncManagedWorkflows(
 ) []FileChange {
 	var changes []FileChange
 
-	workflowNames := []string{WorkflowPrCommands, WorkflowPollReactions}
+	workflowNames := []string{WorkflowPrCommands, WorkflowPoll}
 
 	for _, workflowName := range workflowNames {
 		if !shouldSyncWorkflow(orgConfig, syncConfig, workflowName) {
@@ -241,7 +254,15 @@ func syncSingleManagedWorkflow(
 	targetPath := ".github/workflows/" + workflowName + ".yml"
 	existingPath, exists := existingWorkflows[workflowName]
 
+	// Check for legacy workflow name if current doesn't exist
 	if !exists {
+		if legacyChanges := handleLegacyWorkflow(
+			ctx, log, client, org, repo, workflowName, targetPath,
+			expectedContent, existingWorkflows, stats,
+		); legacyChanges != nil {
+			return legacyChanges
+		}
+
 		return handleNewWorkflow(log, workflowName, targetPath, expectedContent, stats)
 	}
 
@@ -269,6 +290,75 @@ func handleNewWorkflow(
 		Content: expectedContent,
 		Action:  "create",
 	}}
+}
+
+// handleLegacyWorkflow checks for and migrates legacy-named workflows.
+// Returns nil if no legacy workflow found or if it's not smyklot-managed.
+func handleLegacyWorkflow(
+	ctx context.Context,
+	log *logger.Logger,
+	client *Client,
+	org string,
+	repo string,
+	workflowName string,
+	targetPath string,
+	expectedContent []byte,
+	existingWorkflows map[string]string,
+	stats *SmyklotSyncStats,
+) []FileChange {
+	legacyName, hasLegacy := legacyWorkflowNames[workflowName]
+	if !hasLegacy {
+		return nil
+	}
+
+	legacyPath, legacyExists := existingWorkflows[legacyName]
+	if !legacyExists {
+		return nil
+	}
+
+	log.Debug("found legacy workflow", "legacy", legacyName, "current", workflowName)
+
+	// Fetch legacy workflow content to verify it's smyklot-managed
+	fileContent, _, _, err := client.Repositories.GetContents(ctx, org, repo, legacyPath, nil)
+	if err != nil {
+		log.Warn("failed to fetch legacy workflow content",
+			"path", legacyPath, "error", err)
+
+		return nil
+	}
+
+	legacyContent, err := fileContent.GetContent()
+	if err != nil {
+		log.Warn("failed to decode legacy workflow content",
+			"path", legacyPath, "error", err)
+
+		return nil
+	}
+
+	if !strings.Contains(legacyContent, smyklotManagedHeader) {
+		log.Info("legacy workflow exists but is not smyklot-managed, skipping migration",
+			"path", legacyPath)
+
+		return nil
+	}
+
+	log.Info("migrating legacy workflow to new name",
+		"from", legacyPath, "to", targetPath)
+
+	stats.Replaced++
+	stats.ReplacedFiles = append(stats.ReplacedFiles, targetPath)
+
+	return []FileChange{
+		{
+			Path:   legacyPath,
+			Action: "delete",
+		},
+		{
+			Path:    targetPath,
+			Content: expectedContent,
+			Action:  "create",
+		},
+	}
 }
 
 // handleExistingWorkflow handles updating an existing workflow.
@@ -371,9 +461,18 @@ func syncVersionOnlyWorkflows(
 	version string,
 	tag string,
 	orgConfig *configtypes.SmyklotFile,
+	syncConfig *configtypes.SyncConfig,
 	workflowFiles []string,
 	stats *SmyklotSyncStats,
 ) []FileChange {
+	// Check repo-level version skip first
+	if syncConfig.Sync.Smyklot.Version.Skip {
+		log.Debug("version-only sync skipped by repo config (sync.smyklot.version.skip=true)")
+
+		return nil
+	}
+
+	// Check org-level sync_version setting
 	if orgConfig.SyncVersion == nil || !*orgConfig.SyncVersion || len(workflowFiles) == 0 {
 		return nil
 	}
@@ -384,7 +483,7 @@ func syncVersionOnlyWorkflows(
 
 	for _, workflowPath := range workflowFiles {
 		filename := filepath.Base(workflowPath)
-		if filename == WorkflowPrCommands+".yml" || filename == WorkflowPollReactions+".yml" {
+		if filename == WorkflowPrCommands+".yml" || filename == WorkflowPoll+".yml" {
 			continue
 		}
 
@@ -602,7 +701,7 @@ func upsertSmyklotPullRequest(
 	tag string,
 	stats *SmyklotSyncStats,
 ) (int, error) {
-	prTitle := "chore(deps): update smyklot to " + tag
+	prTitle := buildSmyklotPRTitle(tag, stats)
 	prBody := buildSmyklotPRBody(tag, stats)
 
 	// Check for existing PR
@@ -676,15 +775,57 @@ func finalizeSmyklotPR(
 	return nil
 }
 
+// buildSmyklotPRTitle builds the PR title based on what changes are included.
+func buildSmyklotPRTitle(tag string, stats *SmyklotSyncStats) string {
+	hasWorkflowChanges := stats.Installed > 0 || stats.Replaced > 0
+	hasVersionChanges := stats.VersionOnly > 0
+
+	switch {
+	case hasVersionChanges && hasWorkflowChanges:
+		// Both version and workflow changes
+		return "chore(smyklot): update to " + tag + " and sync workflows"
+
+	case hasVersionChanges:
+		// Version-only changes
+		return "chore(deps): update smyklot to " + tag
+
+	case hasWorkflowChanges:
+		// Workflow-only changes (no version bump in other files)
+		return "chore(sync): sync smyklot workflows"
+
+	default:
+		// Fallback (shouldn't happen if we have changes)
+		return "chore(sync): sync smyklot"
+	}
+}
+
 // buildSmyklotPRBody builds the PR body text for smyklot sync.
 func buildSmyklotPRBody(tag string, stats *SmyklotSyncStats) string {
 	var body strings.Builder
 
-	body.WriteString(fmt.Sprintf(
-		"Updates [`smykla-labs/smyklot`](https://github.com/smykla-labs/smyklot) "+
-			"to version [`%s`](https://github.com/smykla-labs/smyklot/releases/tag/%s).\n",
-		tag, tag,
-	))
+	hasWorkflowChanges := stats.Installed > 0 || stats.Replaced > 0
+	hasVersionChanges := stats.VersionOnly > 0
+
+	switch {
+	case hasVersionChanges:
+		// Version changes present - mention the update
+		body.WriteString(fmt.Sprintf(
+			"Updates [`smykla-labs/smyklot`](https://github.com/smykla-labs/smyklot) "+
+				"to version [`%s`](https://github.com/smykla-labs/smyklot/releases/tag/%s).\n",
+			tag, tag,
+		))
+
+	case hasWorkflowChanges:
+		// Workflow-only changes
+		body.WriteString(fmt.Sprintf(
+			"Syncs smyklot workflow files from "+
+				"[`smykla-labs/smyklot@%s`](https://github.com/smykla-labs/smyklot/releases/tag/%s).\n",
+			tag, tag,
+		))
+
+	default:
+		body.WriteString("Syncs smyklot configuration.\n")
+	}
 
 	// Workflows installed section
 	if len(stats.InstalledFiles) > 0 {
@@ -791,8 +932,8 @@ func fetchSmyklotOrgConfig(
 			return &configtypes.SmyklotFile{
 				SyncVersion: boolPtr(true),
 				Workflows: configtypes.SmyklotWorkflowsConfig{
-					PrCommands:    boolPtr(true),
-					PollReactions: boolPtr(true),
+					PrCommands: boolPtr(true),
+					Poll:       boolPtr(true),
 				},
 			}, nil
 		}
@@ -827,8 +968,8 @@ func shouldSyncWorkflow(
 	switch workflowName {
 	case WorkflowPrCommands:
 		orgEnabled = orgConfig.Workflows.PrCommands
-	case WorkflowPollReactions:
-		orgEnabled = orgConfig.Workflows.PollReactions
+	case WorkflowPoll:
+		orgEnabled = orgConfig.Workflows.Poll
 	default:
 		return false
 	}
@@ -839,8 +980,8 @@ func shouldSyncWorkflow(
 	switch workflowName {
 	case WorkflowPrCommands:
 		repoEnabled = repoConfig.Sync.Smyklot.Workflows.PrCommands
-	case WorkflowPollReactions:
-		repoEnabled = repoConfig.Sync.Smyklot.Workflows.PollReactions
+	case WorkflowPoll:
+		repoEnabled = repoConfig.Sync.Smyklot.Workflows.Poll
 	}
 
 	// Repo config takes precedence

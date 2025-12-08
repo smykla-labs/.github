@@ -75,3 +75,16 @@ jobs:
           repo: ${{ matrix.repo.name }}
           labels_file: .github/labels.yml
           dry_run: ${{ inputs.dry_run || 'false' }}
+
+      - name: Report sync status
+        if: always()
+        env:
+          REPO_NAME: ${{ matrix.repo.name }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: |
+          echo "### 🏷️ ${REPO_NAME}" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$DRY_RUN" == "true" ]]; then
+            echo "ℹ️ Dry run completed" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "✅ Labels synced" >> "$GITHUB_STEP_SUMMARY"
+          fi

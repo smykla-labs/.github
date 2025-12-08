@@ -84,3 +84,51 @@ jobs:
           repo: ${{ matrix.repo.name }}
           files_config: ${{ needs.prepare.outputs.files_config }}
           dry_run: ${{ inputs.dry_run || 'false' }}
+
+      - name: Report sync status
+        if: always()
+        env:
+          REPO: ${{ github.repository_owner }}/${{ matrix.repo.name }}
+          REPO_NAME: ${{ matrix.repo.name }}
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          echo "### 📁 ${REPO_NAME}" >> "$GITHUB_STEP_SUMMARY"
+
+          # Search for files sync PRs by branch
+          PR_JSON=$(gh pr list --repo "$REPO" --state open \
+            --head "chore/org-sync" \
+            --json number,url,title,body --jq '.[0] // empty' 2>/dev/null || true)
+
+          if [[ -z "$PR_JSON" ]]; then
+            echo "ℹ️ No sync PR (files up to date or dry run)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          PR_NUM=$(echo "$PR_JSON" | jq -r '.number')
+          PR_URL=$(echo "$PR_JSON" | jq -r '.url')
+          PR_BODY=$(echo "$PR_JSON" | jq -r '.body')
+
+          # Extract change sections from PR body (patterns match start of headers)
+          FILES_MERGED=$(echo "$PR_BODY" | sed -n '/^## Files Merged/,/^##[^#]/p' | grep "^- " || true)
+          FILES_CREATED=$(echo "$PR_BODY" | sed -n '/^## Files Created/,/^##[^#]/p' | grep "^- " || true)
+          FILES_UPDATED=$(echo "$PR_BODY" | sed -n '/^## Files Updated/,/^##[^#]/p' | grep "^- " || true)
+
+          {
+            printf '✅ **PR:** [#%s](%s)\n\n' "$PR_NUM" "$PR_URL"
+
+            if [[ -n "$FILES_MERGED" ]]; then
+              printf '**Files Merged:**\n%s\n\n' "$FILES_MERGED"
+            fi
+
+            if [[ -n "$FILES_CREATED" ]]; then
+              printf '**Files Created:**\n%s\n\n' "$FILES_CREATED"
+            fi
+
+            if [[ -n "$FILES_UPDATED" ]]; then
+              printf '**Files Updated:**\n%s\n\n' "$FILES_UPDATED"
+            fi
+
+            if echo "$PR_BODY" | grep -q "CAUTION"; then
+              printf '⚠️ **Files being deleted** - review PR for details\n'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -909,8 +909,12 @@
       "properties": {
         "skip": {
           "default": false,
-          "description": "Skip smyklot version synchronization only. Label and file sync still run unless their respective skip flags are set. Use this for repos that don't use smyklot or manage their own versions",
+          "description": "Skip ALL smyklot synchronization (both workflows and version updates). Label and file sync still run unless their respective skip flags are set. Use this for repos that don't use smyklot at all",
           "type": "boolean"
+        },
+        "version": {
+          "$ref": "#/$defs/SmyklotVersionConfig",
+          "description": "Version synchronization configuration"
         },
         "workflows": {
           "$ref": "#/$defs/SmyklotWorkflowsConfig",
@@ -919,18 +923,30 @@
       },
       "type": "object"
     },
+    "SmyklotVersionConfig": {
+      "additionalProperties": false,
+      "description": "Controls version-only updates in non-managed workflow files",
+      "properties": {
+        "skip": {
+          "default": false,
+          "description": "Skip version-only updates in workflow files. Managed workflows (smyklot-pr-commands, smyklot-poll) are still synced unless their respective workflow flags are disabled",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
     "SmyklotWorkflowsConfig": {
       "additionalProperties": false,
       "description": "Controls which smyklot workflows are synced to a repository",
       "properties": {
-        "poll_reactions": {
+        "poll": {
           "default": true,
-          "description": "Sync poll-reactions workflow. Default: true",
+          "description": "Sync smyklot-poll workflow. Default: true",
           "type": "boolean"
         },
         "pr_commands": {
           "default": true,
-          "description": "Sync pr-commands workflow. Default: true",
+          "description": "Sync smyklot-pr-commands workflow. Default: true",
           "type": "boolean"
         }
       },

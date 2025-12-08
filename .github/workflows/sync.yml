@@ -1,0 +1,96 @@
+---
+name: Sync All
+
+on:
+  workflow_dispatch:
+    inputs:
+      sync_labels:
+        description: "Sync labels"
+        required: false
+        type: boolean
+        default: true
+      sync_files:
+        description: "Sync files"
+        required: false
+        type: boolean
+        default: true
+      sync_settings:
+        description: "Sync settings"
+        required: false
+        type: boolean
+        default: true
+      sync_smyklot:
+        description: "Sync smyklot"
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: "Dry run (no changes)"
+        required: false
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  trigger-syncs:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Generate App Token
+        id: token
+        uses: actions/create-github-app-token@7e473efe3cb98aa54f8d4bac15400b15fad77d94 # v2.2.0
+        with:
+          app-id: ${{ vars.SMYKLOT_APP_ID }}
+          private-key: ${{ secrets.SMYKLOT_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: .github
+
+      - name: Trigger sync workflows
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          REPO: ${{ github.repository }}
+          SYNC_LABELS: ${{ inputs.sync_labels }}
+          SYNC_FILES: ${{ inputs.sync_files }}
+          SYNC_SETTINGS: ${{ inputs.sync_settings }}
+          SYNC_SMYKLOT: ${{ inputs.sync_smyklot }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          echo "## 🔄 Triggering Sync Workflows" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$SYNC_LABELS" == "true" ]]; then
+            echo "Triggering Sync Labels..."
+            gh workflow run sync-labels.yml --repo "$REPO" -f "dry_run=$DRY_RUN"
+            echo "- ✅ Sync Labels triggered" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ⏭️ Sync Labels skipped" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [[ "$SYNC_FILES" == "true" ]]; then
+            echo "Triggering Sync Files..."
+            gh workflow run sync-files.yml --repo "$REPO" -f "dry_run=$DRY_RUN"
+            echo "- ✅ Sync Files triggered" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ⏭️ Sync Files skipped" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [[ "$SYNC_SETTINGS" == "true" ]]; then
+            echo "Triggering Sync Settings..."
+            gh workflow run sync-settings.yml --repo "$REPO" -f "dry_run=$DRY_RUN"
+            echo "- ✅ Sync Settings triggered" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ⏭️ Sync Settings skipped" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [[ "$SYNC_SMYKLOT" == "true" ]]; then
+            echo "Triggering Sync Smyklot..."
+            gh workflow run sync-smyklot.yml --repo "$REPO" -f "use_latest=true" -f "dry_run=$DRY_RUN"
+            echo "- ✅ Sync Smyklot triggered" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ⏭️ Sync Smyklot skipped" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$DRY_RUN" == "true" ]]; then
+            echo "ℹ️ **Dry run mode** - no changes will be made" >> "$GITHUB_STEP_SUMMARY"
+          fi

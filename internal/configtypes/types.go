@@ -101,23 +101,34 @@ const (
 //
 //nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type SmyklotConfig struct {
-	// Skip smyklot version synchronization only. Label and file sync still run unless their
-	// respective skip flags are set. Use this for repos that don't use smyklot or manage their
-	// own versions
+	// Skip ALL smyklot synchronization (both workflows and version updates). Label and file sync
+	// still run unless their respective skip flags are set. Use this for repos that don't use
+	// smyklot at all
 	Skip bool `json:"skip" jsonschema:"default=false" yaml:"skip"`
+	// Version synchronization configuration
+	Version SmyklotVersionConfig `json:"version" yaml:"version"`
 	// Which smyklot workflows to sync to this repository. Allows per-repo control over workflow
 	// installation
 	Workflows SmyklotWorkflowsConfig `json:"workflows" yaml:"workflows"`
+}
+
+// Controls version-only updates in non-managed workflow files
+//
+//nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
+type SmyklotVersionConfig struct {
+	// Skip version-only updates in workflow files. Managed workflows (smyklot-pr-commands,
+	// smyklot-poll) are still synced unless their respective workflow flags are disabled
+	Skip bool `json:"skip" jsonschema:"default=false" yaml:"skip"`
 }
 
 // Controls which smyklot workflows are synced to a repository
 //
 //nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type SmyklotWorkflowsConfig struct {
-	// Sync pr-commands workflow. Default: true
+	// Sync smyklot-pr-commands workflow. Default: true
 	PrCommands *bool `json:"pr_commands" jsonschema:"default=true" yaml:"pr_commands"`
-	// Sync poll-reactions workflow. Default: true
-	PollReactions *bool `json:"poll_reactions" jsonschema:"default=true" yaml:"poll_reactions"`
+	// Sync smyklot-poll workflow. Default: true
+	Poll *bool `json:"poll" jsonschema:"default=true" yaml:"poll"`
 }
 
 // Controls synchronization of GitHub repository settings like merge strategies, branch
@@ -437,8 +448,8 @@ func (sf *SmyklotFile) SetDefaults() {
 		sf.Workflows.PrCommands = &val
 	}
 
-	if sf.Workflows.PollReactions == nil {
+	if sf.Workflows.Poll == nil {
 		val := true
-		sf.Workflows.PollReactions = &val
+		sf.Workflows.Poll = &val
 	}
 }

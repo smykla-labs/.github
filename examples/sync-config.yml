@@ -31,8 +31,13 @@
 #         strategy: string       # Merge strategy: "deep-merge" or "shallow-merge"
 #         overrides: object      # Override values to merge with org template
 #
-#   smyklot:                     # Smyklot version sync configuration
-#     skip: bool                 # Skip smyklot version sync (default: false)
+#   smyklot:                     # Smyklot synchronization configuration
+#     skip: bool                 # Skip ALL smyklot sync (default: false)
+#     version:                   # Version-only sync configuration
+#       skip: bool               # Skip version updates in workflows (default: false)
+#     workflows:                 # Workflow installation configuration
+#       pr_commands: bool        # Sync smyklot-pr-commands workflow (default: true)
+#       poll: bool               # Sync smyklot-poll workflow (default: true)
 #
 #   settings:                    # Settings sync configuration
 #     skip: bool                 # Skip settings sync (default: false)
@@ -105,9 +110,21 @@
 #   For shallow-merge: top-level keys only.
 #
 # sync.smyklot.skip (boolean, default: false)
-#   When true, skips smyklot version synchronization only.
+#   When true, skips ALL smyklot synchronization (both workflows and version updates).
 #   Label and file sync still run unless their respective skip flags are set.
-#   Use this for repos that don't use smyklot or manage their own versions.
+#   Use this for repos that don't use smyklot at all.
+#
+# sync.smyklot.version.skip (boolean, default: false)
+#   When true, skips version-only updates in workflow files.
+#   Managed workflows (smyklot-pr-commands, smyklot-poll) are still synced
+#   unless their respective workflow flags are disabled.
+#   Use this for repos that manage their own smyklot version references.
+#
+# sync.smyklot.workflows.pr_commands (boolean, default: true)
+#   When true, syncs the smyklot-pr-commands.yml workflow to this repository.
+#
+# sync.smyklot.workflows.poll (boolean, default: true)
+#   When true, syncs the smyklot-poll.yml workflow to this repository.
 #
 # sync.settings.skip (boolean, default: false)
 #   When true, skips settings synchronization only.
@@ -184,10 +201,25 @@ sync: {}
 #   files:
 #     skip: true
 
-# Example 6: Skip smyklot sync only (for repos that don't use smyklot)
+# Example 6: Skip all smyklot sync (for repos that don't use smyklot at all)
 # sync:
 #   smyklot:
 #     skip: true
+
+# Example 6a: Skip version updates only (keep workflow sync)
+# Use when you manage smyklot versions manually but want workflow templates synced
+# sync:
+#   smyklot:
+#     version:
+#       skip: true
+
+# Example 6b: Skip specific workflows (keep version sync)
+# Use when you only want certain smyklot workflows
+# sync:
+#   smyklot:
+#     workflows:
+#       pr_commands: true
+#       poll: false  # Don't sync smyklot-poll workflow
 
 # Example 7: Skip settings sync only (for repos requiring custom settings)
 # sync:

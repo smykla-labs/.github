@@ -2,6 +2,12 @@
 name: Sync Smyklot
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "action.yml"
+      - "smyklot-templates/**"
+      - ".github/workflows/sync-smyklot.yml"
   repository_dispatch:
     types: [smyklot-release]
   workflow_dispatch:
@@ -179,3 +185,47 @@ jobs:
           smyklot_file: .github/smyklot.yml
           smyklot_templates_dir: smyklot-templates
           dry_run: ${{ inputs.dry_run || 'false' }}
+
+      - name: Report sync status
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          REPO: ${{ github.repository_owner }}/${{ matrix.repo.name }}
+          REPO_NAME: ${{ matrix.repo.name }}
+        run: |
+          echo "### 🤖 ${REPO_NAME}" >> "$GITHUB_STEP_SUMMARY"
+
+          # Search for smyklot PRs (both version updates and workflow syncs)
+          PR_JSON=$(gh pr list --repo "$REPO" --state open \
+            --head "chore/sync-smyklot" \
+            --json number,url,title,body --jq '.[0] // empty' 2>/dev/null || true)
+
+          if [[ -z "$PR_JSON" ]]; then
+            echo "ℹ️ No sync PR (already up to date or dry run)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          PR_NUM=$(echo "$PR_JSON" | jq -r '.number')
+          PR_URL=$(echo "$PR_JSON" | jq -r '.url')
+          PR_BODY=$(echo "$PR_JSON" | jq -r '.body')
+
+          # Extract change sections from PR body (patterns match start of headers)
+          WORKFLOWS_INSTALLED=$(echo "$PR_BODY" | sed -n '/^## Workflows Installed/,/^##[^#]/p' | grep "^- " || true)
+          WORKFLOWS_REPLACED=$(echo "$PR_BODY" | sed -n '/^## Workflows Replaced/,/^##[^#]/p' | grep "^- " || true)
+          VERSION_UPDATES=$(echo "$PR_BODY" | sed -n '/^## Version Updates/,/^##[^#]/p' | grep "^- " || true)
+
+          {
+            printf '✅ **PR:** [#%s](%s)\n\n' "$PR_NUM" "$PR_URL"
+
+            if [[ -n "$WORKFLOWS_INSTALLED" ]]; then
+              printf '**Workflows Installed:**\n%s\n\n' "$WORKFLOWS_INSTALLED"
+            fi
+
+            if [[ -n "$WORKFLOWS_REPLACED" ]]; then
+              printf '**Workflows Replaced:**\n%s\n\n' "$WORKFLOWS_REPLACED"
+            fi
+
+            if [[ -n "$VERSION_UPDATES" ]]; then
+              printf '**Version Updates:**\n%s\n\n' "$VERSION_UPDATES"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

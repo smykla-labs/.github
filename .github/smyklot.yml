@@ -13,8 +13,8 @@ sync_version: true
 
 # Which workflows to sync to all repositories by default
 workflows:
-  # Sync pr-commands workflow (enables slash commands in PRs)
+  # Sync smyklot-pr-commands workflow (enables slash commands in PRs)
   pr_commands: true
 
-  # Sync poll-reactions workflow (enables reaction-based polling)
-  poll_reactions: true
+  # Sync smyklot-poll workflow (enables reaction-based polling)
+  poll: true
