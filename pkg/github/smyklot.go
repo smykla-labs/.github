@@ -20,10 +20,23 @@ const (
 	smyklotBranchPrefix = "chore/sync-smyklot"
 	smyklotPRLabel      = "ci/skip-all"
 
-	// Workflow template names
-	WorkflowPrCommands    = "pr-commands"
-	WorkflowPollReactions = "poll-reactions"
+	// Workflow template names (current)
+	WorkflowPrCommands    = "smyklot-pr-commands"
+	WorkflowPollReactions = "smyklot-poll"
+
+	// Legacy workflow names (for migration)
+	legacyPrCommands    = "pr-commands"
+	legacyPollReactions = "poll-reactions"
+
+	// Header comment that identifies smyklot-managed workflows
+	smyklotManagedHeader = "# This file is managed by smykla-labs/.github org sync."
 )
+
+// legacyWorkflowNames maps current workflow names to their legacy equivalents.
+var legacyWorkflowNames = map[string]string{
+	WorkflowPrCommands:    legacyPrCommands,
+	WorkflowPollReactions: legacyPollReactions,
+}
 
 // SmyklotSyncStats tracks smyklot sync statistics.
 type SmyklotSyncStats struct {
@@ -241,7 +254,15 @@ func syncSingleManagedWorkflow(
 	targetPath := ".github/workflows/" + workflowName + ".yml"
 	existingPath, exists := existingWorkflows[workflowName]
 
+	// Check for legacy workflow name if current doesn't exist
 	if !exists {
+		if legacyChanges := handleLegacyWorkflow(
+			ctx, log, client, org, repo, workflowName, targetPath,
+			expectedContent, existingWorkflows, stats,
+		); legacyChanges != nil {
+			return legacyChanges
+		}
+
 		return handleNewWorkflow(log, workflowName, targetPath, expectedContent, stats)
 	}
 
@@ -269,6 +290,75 @@ func handleNewWorkflow(
 		Content: expectedContent,
 		Action:  "create",
 	}}
+}
+
+// handleLegacyWorkflow checks for and migrates legacy-named workflows.
+// Returns nil if no legacy workflow found or if it's not smyklot-managed.
+func handleLegacyWorkflow(
+	ctx context.Context,
+	log *logger.Logger,
+	client *Client,
+	org string,
+	repo string,
+	workflowName string,
+	targetPath string,
+	expectedContent []byte,
+	existingWorkflows map[string]string,
+	stats *SmyklotSyncStats,
+) []FileChange {
+	legacyName, hasLegacy := legacyWorkflowNames[workflowName]
+	if !hasLegacy {
+		return nil
+	}
+
+	legacyPath, legacyExists := existingWorkflows[legacyName]
+	if !legacyExists {
+		return nil
+	}
+
+	log.Debug("found legacy workflow", "legacy", legacyName, "current", workflowName)
+
+	// Fetch legacy workflow content to verify it's smyklot-managed
+	fileContent, _, _, err := client.Repositories.GetContents(ctx, org, repo, legacyPath, nil)
+	if err != nil {
+		log.Warn("failed to fetch legacy workflow content",
+			"path", legacyPath, "error", err)
+
+		return nil
+	}
+
+	legacyContent, err := fileContent.GetContent()
+	if err != nil {
+		log.Warn("failed to decode legacy workflow content",
+			"path", legacyPath, "error", err)
+
+		return nil
+	}
+
+	if !strings.Contains(legacyContent, smyklotManagedHeader) {
+		log.Info("legacy workflow exists but is not smyklot-managed, skipping migration",
+			"path", legacyPath)
+
+		return nil
+	}
+
+	log.Info("migrating legacy workflow to new name",
+		"from", legacyPath, "to", targetPath)
+
+	stats.Replaced++
+	stats.ReplacedFiles = append(stats.ReplacedFiles, targetPath)
+
+	return []FileChange{
+		{
+			Path:   legacyPath,
+			Action: "delete",
+		},
+		{
+			Path:    targetPath,
+			Content: expectedContent,
+			Action:  "create",
+		},
+	}
 }
 
 // handleExistingWorkflow handles updating an existing workflow.

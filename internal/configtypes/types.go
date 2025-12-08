@@ -116,8 +116,8 @@ type SmyklotConfig struct {
 //
 //nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type SmyklotVersionConfig struct {
-	// Skip version-only updates in workflow files. Managed workflows (pr-commands, poll-reactions)
-	// are still synced unless their respective workflow flags are disabled
+	// Skip version-only updates in workflow files. Managed workflows (smyklot-pr-commands,
+	// smyklot-poll) are still synced unless their respective workflow flags are disabled
 	Skip bool `json:"skip" jsonschema:"default=false" yaml:"skip"`
 }
 
@@ -125,9 +125,9 @@ type SmyklotVersionConfig struct {
 //
 //nolint:staticcheck // ST1021: Descriptive comment preferred over struct name prefix
 type SmyklotWorkflowsConfig struct {
-	// Sync pr-commands workflow. Default: true
+	// Sync smyklot-pr-commands workflow. Default: true
 	PrCommands *bool `json:"pr_commands" jsonschema:"default=true" yaml:"pr_commands"`
-	// Sync poll-reactions workflow. Default: true
+	// Sync smyklot-poll workflow. Default: true
 	PollReactions *bool `json:"poll_reactions" jsonschema:"default=true" yaml:"poll_reactions"`
 }
 

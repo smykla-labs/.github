@@ -116,15 +116,15 @@
 #
 # sync.smyklot.version.skip (boolean, default: false)
 #   When true, skips version-only updates in workflow files.
-#   Managed workflows (pr-commands, poll-reactions) are still synced unless
-#   their respective workflow flags are disabled.
+#   Managed workflows (smyklot-pr-commands, smyklot-poll) are still synced
+#   unless their respective workflow flags are disabled.
 #   Use this for repos that manage their own smyklot version references.
 #
 # sync.smyklot.workflows.pr_commands (boolean, default: true)
-#   When true, syncs the pr-commands.yml workflow to this repository.
+#   When true, syncs the smyklot-pr-commands.yml workflow to this repository.
 #
 # sync.smyklot.workflows.poll_reactions (boolean, default: true)
-#   When true, syncs the poll-reactions.yml workflow to this repository.
+#   When true, syncs the smyklot-poll.yml workflow to this repository.
 #
 # sync.settings.skip (boolean, default: false)
 #   When true, skips settings synchronization only.

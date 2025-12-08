@@ -44,7 +44,7 @@
   },
   "ignorePaths": [
     "**/tmp/**",
-    ".github/workflows/pr-commands.yml",
-    ".github/workflows/poll-reactions.yml"
+    ".github/workflows/smyklot-pr-commands.yml",
+    ".github/workflows/smyklot-poll.yml"
   ]
 }
