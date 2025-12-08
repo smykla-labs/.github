@@ -12,13 +12,13 @@ on:
   push:
     branches: [main]
     paths:
-      - "cmd/dotsync/**"
-      - "pkg/**"
-      - "internal/**"
       - "go.mod"
       - "go.sum"
-      - ".goreleaser.yml"
       - "Dockerfile"
+      - ".goreleaser.yml"
+      - "pkg/**"
+      - "internal/**"
+      - "cmd/dotsync/**"
       - ".github/workflows/release-dotsync.yml"
   pull_request:
     types: [closed]
@@ -57,7 +57,33 @@ jobs:
     permissions:
       actions: write
       contents: read
+    outputs:
+      sync_workflows: ${{ steps.discover.outputs.workflows }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          sparse-checkout: .github/workflows
+          sparse-checkout-cone-mode: false
+
+      - name: Discover sync workflows
+        id: discover
+        run: |
+          # Find all sync-*.yml workflow files
+          workflows=$(find .github/workflows -name 'sync-*.yml' -type f -exec basename {} \; | sort)
+
+          if [ -z "$workflows" ]; then
+            echo "❌ No sync workflows found"
+            exit 1
+          fi
+
+          echo "Found sync workflows:"
+          echo "$workflows"
+
+          # Convert to space-separated string for gh run list
+          workflows_list=$(echo "$workflows" | tr '\n' ' ' | sed 's/ $//')
+          echo "workflows=$workflows_list" >> "$GITHUB_OUTPUT"
+
       - name: Generate App Token
         id: app-token
         uses: actions/create-github-app-token@7e473efe3cb98aa54f8d4bac15400b15fad77d94 # v2.2.0
@@ -69,19 +95,22 @@ jobs:
         timeout-minutes: 5
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SYNC_WORKFLOWS: ${{ steps.discover.outputs.workflows }}
         run: |
           echo "Checking for running sync workflows..."
 
           while true; do
-            # Get all running workflow runs for sync workflows
-            running_syncs=$(gh run list \
-              --repo smykla-labs/.github \
-              --workflow sync-labels.yml \
-              --workflow sync-files.yml \
-              --workflow sync-settings.yml \
-              --status in_progress \
-              --json databaseId \
-              --jq 'length')
+            running_syncs=0
+
+            for workflow in $SYNC_WORKFLOWS; do
+              count=$(gh run list \
+                --repo smykla-labs/.github \
+                --workflow "$workflow" \
+                --status in_progress \
+                --json databaseId \
+                --jq 'length')
+              running_syncs=$((running_syncs + count))
+            done
 
             if [ "$running_syncs" -eq 0 ]; then
               echo "✅ No sync workflows running"
@@ -95,11 +124,15 @@ jobs:
       - name: Disable sync workflows
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SYNC_WORKFLOWS: ${{ steps.discover.outputs.workflows }}
         run: |
           echo "Disabling sync workflows..."
-          gh workflow disable sync-labels.yml --repo smykla-labs/.github
-          gh workflow disable sync-files.yml --repo smykla-labs/.github
-          gh workflow disable sync-settings.yml --repo smykla-labs/.github
+
+          for workflow in $SYNC_WORKFLOWS; do
+            echo "  Disabling $workflow"
+            gh workflow disable "$workflow" --repo smykla-labs/.github
+          done
+
           echo "✅ Sync workflows disabled"
 
   # Run tests and linters in parallel
@@ -325,9 +358,13 @@ jobs:
       - name: Re-enable sync workflows
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SYNC_WORKFLOWS: ${{ needs.prepare.outputs.sync_workflows }}
         run: |
           echo "Re-enabling sync workflows..."
-          gh workflow enable sync-labels.yml --repo smykla-labs/.github
-          gh workflow enable sync-files.yml --repo smykla-labs/.github
-          gh workflow enable sync-settings.yml --repo smykla-labs/.github
+
+          for workflow in $SYNC_WORKFLOWS; do
+            echo "  Enabling $workflow"
+            gh workflow enable "$workflow" --repo smykla-labs/.github
+          done
+
           echo "✅ Sync workflows re-enabled"
