@@ -140,6 +140,7 @@ func GenerateAllSchemas(modulePath, configPkgPath string) ([]*SchemaOutput, erro
 }
 
 // finalizeSchema converts a schema to JSON and applies post-processing.
+// Note: Run `jsonschema fmt` on output for canonical key ordering.
 func finalizeSchema(schema *jsonschema.Schema) ([]byte, error) {
 	// Convert to JSON and back to map for post-processing
 	schemaBytes, err := json.Marshal(schema)
@@ -152,8 +153,8 @@ func finalizeSchema(schema *jsonschema.Schema) ([]byte, error) {
 		return nil, errors.Wrap(err, "unmarshaling schema to map")
 	}
 
-	// Normalize descriptions (replace newlines with spaces)
-	normalizeDescriptions(schemaMap)
+	// Apply lint-fixing transformations
+	applyLintFixes(schemaMap)
 
 	output, err := json.MarshalIndent(schemaMap, "", "  ")
 	if err != nil {
@@ -164,6 +165,15 @@ func finalizeSchema(schema *jsonschema.Schema) ([]byte, error) {
 	output = append(output, '\n')
 
 	return output, nil
+}
+
+// applyLintFixes applies all lint-fixing transformations to the schema.
+func applyLintFixes(schemaMap map[string]any) {
+	// Normalize descriptions (replace newlines with spaces)
+	normalizeDescriptions(schemaMap)
+
+	// Remove type when enum is present (enum_with_type lint rule)
+	removeTypeWithEnum(schemaMap)
 }
 
 // normalizeDescriptions recursively replaces newlines in description fields with spaces.
@@ -182,6 +192,28 @@ func normalizeDescriptions(v any) {
 	case []any:
 		for _, item := range val {
 			normalizeDescriptions(item)
+		}
+	}
+}
+
+// removeTypeWithEnum recursively removes "type" when "enum" is present.
+// This fixes the enum_with_type lint rule: enum values already imply their type.
+func removeTypeWithEnum(v any) {
+	switch val := v.(type) {
+	case map[string]any:
+		// If this object has both "enum" and "type", remove "type"
+		if _, hasEnum := val["enum"]; hasEnum {
+			delete(val, "type")
+		}
+
+		// Recurse into all values
+		for _, value := range val {
+			removeTypeWithEnum(value)
+		}
+
+	case []any:
+		for _, item := range val {
+			removeTypeWithEnum(item)
 		}
 	}
 }
