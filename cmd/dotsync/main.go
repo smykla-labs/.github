@@ -335,6 +335,27 @@ func fetchSyncConfig(
 	return syncConfig, nil
 }
 
+func writeResultFile(log *logger.Logger, resultFile string, result any) error {
+	if resultFile == "" {
+		return nil
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return errors.Wrap(err, "marshaling result to JSON")
+	}
+
+	//nolint:mnd // 0o600 is standard file permission for user-only read/write
+	err = os.WriteFile(resultFile, data, 0o600)
+	if err != nil {
+		return errors.Wrap(err, "writing result file")
+	}
+
+	log.Info("result written to file", "file", resultFile)
+
+	return nil
+}
+
 func createSyncCommand[T any](
 	use string,
 	short string,
@@ -357,6 +378,8 @@ func createSyncCommand[T any](
 				return err
 			}
 
+			resultFile := getStringFlagWithEnvFallback(cmd, "result-file", "")
+
 			log.Info("starting "+syncType+" sync",
 				"org", params.org,
 				"repo", params.repo,
@@ -374,7 +397,7 @@ func createSyncCommand[T any](
 				return err
 			}
 
-			if _, err := syncFn(
+			result, err := syncFn(
 				ctx,
 				log,
 				client,
@@ -383,7 +406,18 @@ func createSyncCommand[T any](
 				params.configFile,
 				syncConfig,
 				params.dryRun,
-			); err != nil {
+			)
+			if err != nil {
+				// Write result file even on error (with failure status)
+				if writeErr := writeResultFile(log, resultFile, result); writeErr != nil {
+					log.Warn("failed to write result file", "error", writeErr)
+				}
+
+				return err
+			}
+
+			// Write result file on success
+			if err := writeResultFile(log, resultFile, result); err != nil {
 				return err
 			}
 
@@ -427,6 +461,7 @@ var filesSyncCmd = &cobra.Command{
 
 		filesConfig := getStringFlagWithEnvFallback(cmd, "files-config", "")
 		configJSON := getStringFlagWithEnvFallback(cmd, "config", "")
+		resultFile := getStringFlagWithEnvFallback(cmd, "result-file", "")
 
 		// These only check INPUT_* env vars (no GitHub standard fallback)
 		branchPrefix := getStringFlagWithEnvFallback(cmd, "branch-prefix", "")
@@ -477,7 +512,7 @@ var filesSyncCmd = &cobra.Command{
 		}
 
 		// Sync files
-		if _, err := github.SyncFiles(
+		result, err := github.SyncFiles(
 			ctx,
 			log,
 			client,
@@ -489,7 +524,18 @@ var filesSyncCmd = &cobra.Command{
 			branchPrefix,
 			prLabels,
 			dryRun,
-		); err != nil {
+		)
+		if err != nil {
+			// Write result file even on error (with failure status)
+			if writeErr := writeResultFile(log, resultFile, result); writeErr != nil {
+				log.Warn("failed to write result file", "error", writeErr)
+			}
+
+			return err
+		}
+
+		// Write result file on success
+		if err := writeResultFile(log, resultFile, result); err != nil {
 			return err
 		}
 
@@ -582,6 +628,7 @@ var smyklotSyncCmd = &cobra.Command{
 		tag := getStringFlagWithEnvFallback(cmd, "tag", "")
 		sha := getStringFlagWithEnvFallback(cmd, "sha", "")
 		configJSON := getStringFlagWithEnvFallback(cmd, "config", "")
+		resultFile := getStringFlagWithEnvFallback(cmd, "result-file", "")
 		templatesDir := getStringFlagWithEnvFallback(cmd, "templates-dir", "smyklot-templates")
 		smyklotFilePath := getStringFlagWithEnvFallback(cmd, "smyklot-file", "")
 
@@ -635,7 +682,7 @@ var smyklotSyncCmd = &cobra.Command{
 		}
 
 		// Sync smyklot version
-		if _, err := github.SyncSmyklot(
+		result, err := github.SyncSmyklot(
 			ctx,
 			log,
 			client,
@@ -648,7 +695,18 @@ var smyklotSyncCmd = &cobra.Command{
 			templatesDir,
 			smyklotFilePath,
 			dryRun,
-		); err != nil {
+		)
+		if err != nil {
+			// Write result file even on error (with failure status)
+			if writeErr := writeResultFile(log, resultFile, result); writeErr != nil {
+				log.Warn("failed to write result file", "error", writeErr)
+			}
+
+			return err
+		}
+
+		// Write result file on success
+		if err := writeResultFile(log, resultFile, result); err != nil {
 			return err
 		}
 
@@ -855,6 +913,7 @@ func init() {
 	labelsSyncCmd.Flags().String("repo", "", "Target repository (e.g., 'myrepo')")
 	labelsSyncCmd.Flags().String("labels-file", "", "Path to labels YAML file")
 	labelsSyncCmd.Flags().String("config", "", "JSON sync config (optional)")
+	labelsSyncCmd.Flags().String("result-file", "", "Path to write result JSON (optional)")
 
 	// Configure file sync command flags
 	filesSyncCmd.Flags().String("repo", "", "Target repository (e.g., 'myrepo')")
@@ -862,6 +921,7 @@ func init() {
 	filesSyncCmd.Flags().String("config", "", "JSON sync config (optional)")
 	filesSyncCmd.Flags().String("branch-prefix", "chore/org-sync", "Branch name prefix")
 	filesSyncCmd.Flags().String("pr-labels", "ci/skip-all", "Comma-separated PR labels")
+	filesSyncCmd.Flags().String("result-file", "", "Path to write result JSON (optional)")
 
 	// Configure files discover command flags
 	filesDiscoverCmd.Flags().String("templates-dir", "templates", "Path to templates directory")
@@ -878,11 +938,13 @@ func init() {
 		"Path to smyklot workflow templates directory",
 	)
 	smyklotSyncCmd.Flags().String("smyklot-file", "", "Path to smyklot.yml config file")
+	smyklotSyncCmd.Flags().String("result-file", "", "Path to write result JSON (optional)")
 
 	// Configure settings sync command flags
 	settingsSyncCmd.Flags().String("repo", "", "Target repository (e.g., 'myrepo')")
 	settingsSyncCmd.Flags().String("settings-file", "", "Path to settings YAML file")
 	settingsSyncCmd.Flags().String("config", "", "JSON sync config (optional)")
+	settingsSyncCmd.Flags().String("result-file", "", "Path to write result JSON (optional)")
 
 	// Configure repos list command flags
 	reposListCmd.Flags().String("format", "json", "Output format (json|names)")
