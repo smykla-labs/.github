@@ -37,6 +37,9 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       triggered_runs: ${{ steps.trigger.outputs.runs }}
+      disabled_count: ${{ steps.trigger.outputs.disabled_count }}
+      skipped_count: ${{ steps.trigger.outputs.skipped_count }}
+      dry_run: ${{ steps.trigger.outputs.dry_run }}
     steps:
       - name: Generate App Token
         id: token
@@ -58,9 +61,6 @@ jobs:
           SYNC_SMYKLOT: ${{ inputs.sync_smyklot }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          echo "## 🔄 Triggering Sync Workflows" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-
           triggered_runs=""
           disabled_count=0
           skipped_count=0
@@ -83,13 +83,13 @@ jobs:
             local extra_args=("$@")
 
             if [[ "$should_sync" != "true" ]]; then
-              echo "- ⏭️ $name skipped (disabled by user)" >> "$GITHUB_STEP_SUMMARY"
+              echo "$name: skipped (disabled by user)"
               ((skipped_count++))
               return
             fi
 
             if ! is_workflow_enabled "$workflow_file"; then
-              echo "- 🚫 $name skipped (workflow disabled)" >> "$GITHUB_STEP_SUMMARY"
+              echo "$name: skipped (workflow disabled)"
               ((disabled_count++))
               return
             fi
@@ -98,8 +98,8 @@ jobs:
             gh workflow run "$workflow_file" --repo "$REPO" -f "dry_run=$DRY_RUN" "${extra_args[@]}"
             sleep 2
             run_id=$(gh run list --workflow="$workflow_file" --repo "$REPO" --limit 1 --json databaseId --jq '.[0].databaseId')
-            triggered_runs="${triggered_runs}${type}:${run_id} "
-            echo "- ✅ $name triggered (run: $run_id)" >> "$GITHUB_STEP_SUMMARY"
+            triggered_runs="${triggered_runs}${type}:${run_id}:${name} "
+            echo "$name: triggered (run: $run_id)"
           }
 
           # Trigger each workflow
@@ -108,19 +108,11 @@ jobs:
           trigger_workflow "Sync Settings" "sync-settings.yml" "settings" "$SYNC_SETTINGS"
           trigger_workflow "Sync Smyklot" "sync-smyklot.yml" "smyklot" "$SYNC_SMYKLOT" -f "use_latest=true"
 
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-
-          # Report status
-          if [[ "$DRY_RUN" == "true" ]]; then
-            echo "ℹ️ **Dry run mode** - no changes will be made" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-          if [[ $disabled_count -gt 0 ]]; then
-            echo "⚠️ **Warning**: $disabled_count workflow(s) skipped due to being disabled (release may be in progress)" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
+          # Output results (no step summary - done in wait-and-summarize)
           echo "runs=${triggered_runs% }" >> "$GITHUB_OUTPUT"
+          echo "disabled_count=$disabled_count" >> "$GITHUB_OUTPUT"
+          echo "skipped_count=$skipped_count" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$DRY_RUN" >> "$GITHUB_OUTPUT"
 
   wait-and-summarize:
     runs-on: ubuntu-24.04
@@ -136,22 +128,77 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: .github
 
-      - name: Wait for workflows to complete
+      - name: Show triggered workflows and wait
         env:
           GH_TOKEN: ${{ steps.token.outputs.token }}
           REPO: ${{ github.repository }}
           TRIGGERED_RUNS: ${{ needs.trigger-syncs.outputs.triggered_runs }}
+          DISABLED_COUNT: ${{ needs.trigger-syncs.outputs.disabled_count }}
+          DRY_RUN: ${{ needs.trigger-syncs.outputs.dry_run }}
         run: |
-          echo "## ⏳ Waiting for Workflows" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "# 🔄 Sync All - Workflow Status"
+            echo ""
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "⚠️ **DRY RUN MODE** - No changes were applied"
+              echo ""
+            fi
+            echo "## Triggered Workflows"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Show triggered workflows with links
+          for run_info in $TRIGGERED_RUNS; do
+            IFS=':' read -r type run_id name <<< "$run_info"
+            url="https://github.com/$REPO/actions/runs/$run_id"
+            echo "- ⏳ **$name**: [View Run]($url)" >> "$GITHUB_STEP_SUMMARY"
+          done
+
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
+          if [[ "$DISABLED_COUNT" -gt 0 ]]; then
+            echo "⚠️ **Warning**: $DISABLED_COUNT workflow(s) skipped (disabled, likely release in progress)" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # Wait for all workflows in parallel using background processes
+          wait_for_run() {
+            local run_id="$1"
+            local name="$2"
+            echo "Waiting for $name (run: $run_id)..."
+
+            while true; do
+              status=$(gh api "repos/$REPO/actions/runs/$run_id" --jq '.status' 2>/dev/null || echo "error")
+
+              if [[ "$status" == "completed" ]]; then
+                conclusion=$(gh api "repos/$REPO/actions/runs/$run_id" --jq '.conclusion')
+                echo "$name: completed ($conclusion)"
+                return 0
+              elif [[ "$status" == "error" ]]; then
+                echo "$name: API error, retrying..."
+                sleep 5
+                continue
+              fi
+
+              sleep 10
+            done
+          }
+
+          # Start all wait processes in background
+          pids=()
           for run_info in $TRIGGERED_RUNS; do
-            type="${run_info%%:*}"
-            run_id="${run_info##*:}"
-            echo "Waiting for $type sync (run: $run_id)..."
-            gh run watch "$run_id" --repo "$REPO" || true
-            echo "- ✅ $type sync completed" >> "$GITHUB_STEP_SUMMARY"
+            IFS=':' read -r type run_id name <<< "$run_info"
+            wait_for_run "$run_id" "$name" &
+            pids+=($!)
           done
+
+          # Wait for all background processes
+          echo "Waiting for ${#pids[@]} workflows to complete..."
+          for pid in "${pids[@]}"; do
+            wait "$pid"
+          done
+
+          echo "All workflows completed!"
 
       - name: Download workflow summaries
         env:
@@ -162,10 +209,9 @@ jobs:
           mkdir -p workflow-summaries
 
           for run_info in $TRIGGERED_RUNS; do
-            type="${run_info%%:*}"
-            run_id="${run_info##*:}"
-            echo "Downloading workflow summary for $type (run: $run_id)..."
-            gh run download "$run_id" --repo "$REPO" --name "workflow-summary-$type" --dir workflow-summaries/ || echo "Warning: No summary artifact for $type"
+            IFS=':' read -r type run_id name <<< "$run_info"
+            echo "Downloading summary for $name (run: $run_id)..."
+            gh run download "$run_id" --repo "$REPO" --name "workflow-summary-$type" --dir workflow-summaries/ || echo "Warning: No summary artifact for $name"
           done
 
       - name: Checkout repository
@@ -179,4 +225,4 @@ jobs:
           token: ${{ steps.token.outputs.token }}
           type: all
           results_dir: workflow-summaries
-          dry_run: ${{ inputs.dry_run }}
+          dry_run: ${{ needs.trigger-syncs.outputs.dry_run }}
