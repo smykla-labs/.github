@@ -67,7 +67,6 @@ jobs:
           repositories: ${{ matrix.repo.name }}
 
       - name: Sync settings to repository
-        id: sync
         uses: ./
         with:
           command: settings
@@ -76,19 +75,12 @@ jobs:
           repo: ${{ matrix.repo.name }}
           settings_file: .github/settings.yml
           dry_run: ${{ inputs.dry_run || 'false' }}
+          result_file: settings-result-${{ matrix.repo.name }}.json
 
-      - name: Report sync status
+      - name: Upload result artifact
         if: always()
-        env:
-          REPO_NAME: ${{ matrix.repo.name }}
-          DRY_RUN: ${{ inputs.dry_run || 'false' }}
-          SYNC_OUTCOME: ${{ steps.sync.outcome }}
-        run: |
-          echo "### ⚙️ ${REPO_NAME}" >> "$GITHUB_STEP_SUMMARY"
-          if [[ "$SYNC_OUTCOME" == "failure" ]]; then
-            echo "❌ Settings sync failed" >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "$DRY_RUN" == "true" ]]; then
-            echo "ℹ️ Dry run completed" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "✅ Settings synced" >> "$GITHUB_STEP_SUMMARY"
-          fi
+        uses: actions/upload-artifact@ea054086033fdfb9b1f127f5c0fb3f03a1906e2f # v4.6.1
+        with:
+          name: settings-result-${{ matrix.repo.name }}
+          path: settings-result-${{ matrix.repo.name }}.json
+          retention-days: 1
