@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.10.1](https://github.com/smykla-labs/.github/compare/dotsync/v1.10.0...dotsync/v1.10.1) (2025-12-09)
+
+### Bug Fixes
+
+* **summary:** read flags from INPUT_* env vars ([b33e749](https://github.com/smykla-labs/.github/commit/b33e749fbd3d2f3fc454d9190667531721c54aeb))
+
 ## [1.10.0](https://github.com/smykla-labs/.github/compare/dotsync/v1.9.2...dotsync/v1.10.0) (2025-12-09)
 
 ### Features
