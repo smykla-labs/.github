@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.3](https://github.com/smykla-labs/.github/compare/dotsync/v1.10.2...dotsync/v1.10.3) (2025-12-09)
+
+### Bug Fixes
+
+* **ci-sync:** fix artifact upload permissions ([bffd19d](https://github.com/smykla-labs/.github/commit/bffd19df1a136719351b239c9616af1915b63b61))
+* **ci-sync:** parallel wait and better summary ([a1ca82c](https://github.com/smykla-labs/.github/commit/a1ca82cb46618d5be6512d24cb27f8c43c2c5df2))
+* **dotsync:** set file permissions to 0o644 ([70013ea](https://github.com/smykla-labs/.github/commit/70013eaa62837e1acf0d88e206ae8954f25fa696))
+
 ## [1.10.2](https://github.com/smykla-labs/.github/compare/dotsync/v1.10.1...dotsync/v1.10.2) (2025-12-09)
 
 ### Bug Fixes
