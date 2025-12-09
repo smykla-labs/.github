@@ -75,16 +75,57 @@ jobs:
           repo: ${{ matrix.repo.name }}
           labels_file: .github/labels.yml
           dry_run: ${{ inputs.dry_run || 'false' }}
+          result_file: labels-result-${{ matrix.repo.name }}.json
 
-      - name: Report sync status
+      - name: Upload result artifact
         if: always()
-        env:
-          REPO_NAME: ${{ matrix.repo.name }}
-          DRY_RUN: ${{ inputs.dry_run || 'false' }}
-        run: |
-          echo "### 🏷️ ${REPO_NAME}" >> "$GITHUB_STEP_SUMMARY"
-          if [[ "$DRY_RUN" == "true" ]]; then
-            echo "ℹ️ Dry run completed" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "✅ Labels synced" >> "$GITHUB_STEP_SUMMARY"
-          fi
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: labels-result-${{ matrix.repo.name }}
+          path: labels-result-${{ matrix.repo.name }}.json
+          retention-days: 1
+
+  summary:
+    needs: sync-labels
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Download all result artifacts
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          pattern: labels-result-*
+          path: results
+
+      - name: Flatten results directory
+        run: mv results/labels-result-*/labels-result-*.json results/ 2>/dev/null || true
+
+      - name: Generate markdown summary
+        uses: ./
+        with:
+          command: summary
+          subcommand: generate
+          type: labels
+          results_dir: results
+          format: markdown
+          dry_run: ${{ inputs.dry_run || 'false' }}
+
+      - name: Generate workflow summary JSON
+        uses: ./
+        with:
+          command: summary
+          subcommand: generate
+          type: labels
+          results_dir: results
+          format: json
+          output_file: summary-labels.json
+          dry_run: ${{ inputs.dry_run || 'false' }}
+
+      - name: Upload workflow summary artifact
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: workflow-summary-labels
+          path: summary-labels.json
+          retention-days: 7
