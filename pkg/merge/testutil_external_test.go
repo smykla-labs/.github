@@ -1,5 +1,10 @@
 package merge_test
 
+// NOTE: These test helper functions (arraysEqual, valuesEqual, mapsEqual) are intentionally
+// duplicated from testutil_test.go to support package isolation. The merge_test package (external
+// tests) and merge package (internal tests) cannot share helper functions directly due to different
+// package namespaces. This duplication ensures both test suites have access to the same utilities.
+
 // arraysEqual compares two slices deeply.
 func arraysEqual(a, b []any) bool {
 	if len(a) != len(b) {

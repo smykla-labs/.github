@@ -79,7 +79,8 @@ type FileMergeConfig struct {
 	Strategy MergeStrategy `json:"strategy" jsonschema:"enum=deep-merge,enum=shallow-merge,enum=overlay,default=deep-merge" yaml:"strategy"`
 	// Per-path array merge strategies. Maps JSONPath expressions (exact match only, e.g.,
 	// "$.packageRules") to merge strategy (append/prepend/replace). Only applies to arrays in the
-	// merged result. If not specified, arrays are replaced (RFC 7396 default behavior)
+	// merged result. If not specified, arrays are replaced (RFC 7396 default behavior).
+	// NOTE: Key pattern validation (JSONPath format) is not enforced at the schema level, only at runtime.
 	ArrayStrategies map[string]string `json:"arrayStrategies,omitempty" jsonschema:"patternProperties=^\\$\\..+$={enum=[append prepend replace]}" yaml:"arrayStrategies,omitempty"`
 	// When true, removes duplicate elements from arrays after merging using array strategies.
 	// Uses deep equality comparison for objects. Has no effect if arrayStrategies is not configured

@@ -112,6 +112,12 @@ func deduplicateArray(arr []any) []any {
 		found := false
 
 		for _, seenItem := range seen {
+			// Skip primitive types when comparing complex types
+			switch seenItem.(type) {
+			case string, float64, int, int64, bool, nil:
+				continue
+			}
+
 			if cmp.Equal(item, seenItem) {
 				found = true
 
