@@ -89,7 +89,7 @@ func SyncFiles(
 	if err != nil {
 		result.CompleteWithError(errors.Wrap(err, "parsing files config"))
 
-		return result, errors.Wrap(err, "parsing files config")
+		return result, err
 	}
 
 	log.Debug("parsed files config", "count", len(fileMappings))
@@ -99,7 +99,7 @@ func SyncFiles(
 	if err != nil {
 		result.CompleteWithError(errors.Wrap(err, "getting repository base info"))
 
-		return result, errors.Wrap(err, "getting repository base info")
+		return result, err
 	}
 
 	// Process files
@@ -172,7 +172,7 @@ func SyncFiles(
 	if err != nil {
 		result.CompleteWithError(errors.Wrap(err, "creating or updating PR"))
 
-		return result, errors.Wrap(err, "creating or updating PR")
+		return result, err
 	}
 
 	result.PRNumber = prNumber

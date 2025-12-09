@@ -62,7 +62,7 @@ func SyncSettings(
 	if err != nil {
 		result.CompleteWithError(errors.Wrap(err, "applying settings merge"))
 
-		return result, errors.Wrap(err, "applying settings merge")
+		return result, err
 	}
 
 	// Compute all changes
@@ -124,7 +124,7 @@ func SyncSettings(
 	); err != nil {
 		result.CompleteWithError(errors.Wrap(err, "syncing rulesets"))
 
-		return result, errors.Wrap(err, "syncing rulesets")
+		return result, err
 	}
 
 	result.Complete(StatusSuccess)

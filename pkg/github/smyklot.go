@@ -80,7 +80,7 @@ func SyncSmyklot(
 	if err != nil {
 		result.CompleteWithError(errors.Wrap(err, "fetching org smyklot config"))
 
-		return result, errors.Wrap(err, "fetching org smyklot config")
+		return result, err
 	}
 
 	// Get repository info
@@ -88,7 +88,7 @@ func SyncSmyklot(
 	if err != nil {
 		result.CompleteWithError(errors.Wrap(err, "getting repository base info"))
 
-		return result, errors.Wrap(err, "getting repository base info")
+		return result, err
 	}
 
 	// List existing workflow files
@@ -96,7 +96,7 @@ func SyncSmyklot(
 	if err != nil {
 		result.CompleteWithError(errors.Wrap(err, "listing workflow files"))
 
-		return result, errors.Wrap(err, "listing workflow files")
+		return result, err
 	}
 
 	// Build map of existing workflows (name without extension -> full path)
@@ -112,7 +112,7 @@ func SyncSmyklot(
 	if err != nil {
 		result.CompleteWithError(errors.Wrap(err, "syncing managed workflows"))
 
-		return result, errors.Wrap(err, "syncing managed workflows")
+		return result, err
 	}
 
 	// Version-only sync for other workflows if enabled
@@ -123,7 +123,7 @@ func SyncSmyklot(
 	if err != nil {
 		result.CompleteWithError(errors.Wrap(err, "syncing version-only workflows"))
 
-		return result, errors.Wrap(err, "syncing version-only workflows")
+		return result, err
 	}
 
 	changes = append(changes, versionChanges...)

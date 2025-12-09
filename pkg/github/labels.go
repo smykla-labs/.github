@@ -55,7 +55,7 @@ func SyncLabels(
 	if err != nil {
 		result.CompleteWithError(errors.Wrap(err, "parsing labels file"))
 
-		return result, errors.Wrap(err, "parsing labels file")
+		return result, err
 	}
 
 	log.Debug("parsed labels file",
@@ -73,7 +73,7 @@ func SyncLabels(
 	if err != nil {
 		result.CompleteWithError(errors.Wrap(err, "fetching current labels"))
 
-		return result, errors.Wrap(err, "fetching current labels")
+		return result, err
 	}
 
 	log.Debug("fetched current labels", "count", len(currentLabels))
@@ -108,7 +108,7 @@ func SyncLabels(
 	if err := applyLabelChanges(ctx, client, org, repo, toCreate, toUpdate, toDelete); err != nil {
 		result.CompleteWithError(errors.Wrap(err, "applying label changes"))
 
-		return result, errors.Wrap(err, "applying label changes")
+		return result, err
 	}
 
 	log.Info("label sync completed successfully")
