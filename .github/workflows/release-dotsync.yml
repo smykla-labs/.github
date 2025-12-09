@@ -135,7 +135,7 @@ jobs:
           echo "Disabling sync workflows..."
 
           for workflow in $SYNC_WORKFLOWS; do
-            state=$(gh workflow view "$workflow" --repo smykla-labs/.github --json state --jq '.state')
+            state=$(gh api repos/smykla-labs/.github/actions/workflows/"$workflow" --jq '.state')
 
             if [ "$state" = "active" ]; then
               echo "  Disabling $workflow"
@@ -375,7 +375,7 @@ jobs:
           echo "Re-enabling sync workflows..."
 
           for workflow in $SYNC_WORKFLOWS; do
-            state=$(gh workflow view "$workflow" --repo smykla-labs/.github --json state --jq '.state')
+            state=$(gh api repos/smykla-labs/.github/actions/workflows/"$workflow" --jq '.state')
 
             if [ "$state" != "active" ]; then
               echo "  Enabling $workflow"
