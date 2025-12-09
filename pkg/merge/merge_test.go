@@ -166,7 +166,7 @@ func TestDeepMerge(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := merge.DeepMerge(tt.base, tt.override)
+			got, err := merge.DeepMerge(tt.base, tt.override, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeepMerge() error = %v, wantErr %v", err, tt.wantErr)
 
@@ -268,7 +268,7 @@ func TestShallowMerge(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := merge.ShallowMerge(tt.base, tt.override)
+			got, err := merge.ShallowMerge(tt.base, tt.override, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ShallowMerge() error = %v, wantErr %v", err, tt.wantErr)
 
@@ -347,7 +347,7 @@ func TestMergeJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := merge.MergeJSON(base, override, tt.strategy)
+			got, err := merge.MergeJSON(base, override, tt.strategy, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MergeJSON() error = %v, wantErr %v", err, tt.wantErr)
 
@@ -372,7 +372,7 @@ func TestMergeYAML(t *testing.T) {
 		"age": 30,
 	}
 
-	got, err := merge.MergeYAML(base, override, configtypes.MergeStrategyDeep)
+	got, err := merge.MergeYAML(base, override, configtypes.MergeStrategyDeep, nil)
 	if err != nil {
 		t.Fatalf("MergeYAML() error = %v", err)
 	}
@@ -807,7 +807,7 @@ func TestDeepMerge_ComplexScenarios(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := merge.DeepMerge(tt.base, tt.override)
+			got, err := merge.DeepMerge(tt.base, tt.override, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeepMerge() error = %v, wantErr %v", err, tt.wantErr)
 
@@ -901,7 +901,7 @@ func TestShallowMerge_ComplexScenarios(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := merge.ShallowMerge(tt.base, tt.override)
+			got, err := merge.ShallowMerge(tt.base, tt.override, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ShallowMerge() error = %v, wantErr %v", err, tt.wantErr)
 
@@ -1041,7 +1041,7 @@ func TestMergeJSON_RealWorldRenovateExample(t *testing.T) {
 		"automerge":  true,
 	}
 
-	result, err := merge.MergeJSON(orgTemplate, repoOverride, configtypes.MergeStrategyDeep)
+	result, err := merge.MergeJSON(orgTemplate, repoOverride, configtypes.MergeStrategyDeep, nil)
 	if err != nil {
 		t.Fatalf("MergeJSON() error = %v", err)
 	}
@@ -1096,7 +1096,7 @@ func TestMergeYAML_RealWorldGitHubActionsExample(t *testing.T) {
 		},
 	}
 
-	result, err := merge.MergeYAML(orgTemplate, repoOverride, configtypes.MergeStrategyDeep)
+	result, err := merge.MergeYAML(orgTemplate, repoOverride, configtypes.MergeStrategyDeep, nil)
 	if err != nil {
 		t.Fatalf("MergeYAML() error = %v", err)
 	}
@@ -1169,7 +1169,7 @@ func TestMergeJSON_NilHandling(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := merge.MergeJSON(tt.base, tt.override, tt.strategy)
+			_, err := merge.MergeJSON(tt.base, tt.override, tt.strategy, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MergeJSON() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -1237,12 +1237,12 @@ func TestMergeStrategies_Equivalence(t *testing.T) {
 	}
 
 	// Test that overlay and deep-merge are equivalent
-	deepResult, err := merge.MergeJSON(base, override, configtypes.MergeStrategyDeep)
+	deepResult, err := merge.MergeJSON(base, override, configtypes.MergeStrategyDeep, nil)
 	if err != nil {
 		t.Fatalf("DeepMerge error = %v", err)
 	}
 
-	overlayResult, err := merge.MergeJSON(base, override, configtypes.MergeStrategyOverlay)
+	overlayResult, err := merge.MergeJSON(base, override, configtypes.MergeStrategyOverlay, nil)
 	if err != nil {
 		t.Fatalf("Overlay error = %v", err)
 	}
@@ -1252,7 +1252,7 @@ func TestMergeStrategies_Equivalence(t *testing.T) {
 	}
 
 	// Test that shallow-merge produces different result
-	shallowResult, err := merge.MergeJSON(base, override, configtypes.MergeStrategyShallow)
+	shallowResult, err := merge.MergeJSON(base, override, configtypes.MergeStrategyShallow, nil)
 	if err != nil {
 		t.Fatalf("ShallowMerge error = %v", err)
 	}

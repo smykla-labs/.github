@@ -141,8 +141,6 @@ func collectArrays(obj map[string]any, prefix string) map[string][]any {
 //
 // Walks the merged result, finds arrays, matches them against arrayStrategies,
 // and re-merges with the specified strategy.
-//
-//nolint:unused // Will be wired to DeepMerge/ShallowMerge in Phase 3
 func applyArrayStrategies(
 	merged, base, override map[string]any,
 	opts *MergeOptions,
@@ -180,8 +178,6 @@ func applyArrayStrategies(
 // setValueAtPath sets a value in a map at the specified JSONPath.
 //
 // Path format: "$.field.nested.array"
-//
-//nolint:unused // Will be called by applyArrayStrategies in Phase 3
 func setValueAtPath(obj map[string]any, path string, value any) error {
 	// Parse path - expect format "$.field.nested.field"
 	if len(path) < 2 || path[0] != '$' || path[1] != '.' {
@@ -252,10 +248,16 @@ func splitPath(path string) []string {
 
 // DeepMerge recursively merges two maps using RFC 7396 JSON Merge Patch semantics.
 //   - Nested objects are merged recursively
-//   - Arrays are replaced, not merged
+//   - Arrays are replaced, not merged (unless opts.ArrayStrategies is specified)
 //   - Null values in override explicitly remove keys from base
 //   - Type mismatches are handled per RFC 7396 (override wins)
-func DeepMerge(base, override map[string]any) (map[string]any, error) {
+//
+// If opts is non-nil and contains ArrayStrategies, arrays at matching paths will be merged
+// according to the specified strategy (append/prepend/replace) instead of replaced.
+func DeepMerge(
+	base, override map[string]any,
+	opts *MergeOptions,
+) (map[string]any, error) {
 	// Handle nil cases
 	if base == nil && override == nil {
 		return make(map[string]any), nil
@@ -301,6 +303,11 @@ func DeepMerge(base, override map[string]any) (map[string]any, error) {
 		)
 	}
 
+	// Apply array merge strategies if configured
+	if err := applyArrayStrategies(result, base, override, opts); err != nil {
+		return nil, errors.Wrap(err, "applying array strategies")
+	}
+
 	return result, nil
 }
 
@@ -308,7 +315,13 @@ func DeepMerge(base, override map[string]any) (map[string]any, error) {
 //   - Only top-level keys are merged
 //   - Nested objects are replaced if overridden, not merged recursively
 //   - Null values in override explicitly remove keys from base
-func ShallowMerge(base, override map[string]any) (map[string]any, error) {
+//
+// If opts is non-nil and contains ArrayStrategies, arrays at matching paths will be merged
+// according to the specified strategy. For shallow merge, only top-level array paths are considered.
+func ShallowMerge(
+	base, override map[string]any,
+	opts *MergeOptions,
+) (map[string]any, error) {
 	if base == nil {
 		base = make(map[string]any)
 	}
@@ -338,13 +351,20 @@ func ShallowMerge(base, override map[string]any) (map[string]any, error) {
 		result[key] = overrideVal
 	}
 
+	// Apply array merge strategies if configured
+	if err := applyArrayStrategies(result, base, override, opts); err != nil {
+		return nil, errors.Wrap(err, "applying array strategies")
+	}
+
 	return result, nil
 }
 
 // MergeJSON merges two JSON objects using the specified strategy.
+// If opts is non-nil, applies array merge strategies to arrays at matching paths.
 func MergeJSON(
 	base, override map[string]any,
 	strategy configtypes.MergeStrategy,
+	opts *MergeOptions,
 ) (map[string]any, error) {
 	// Default to deep-merge if strategy is empty (not specified in config)
 	if strategy == "" {
@@ -353,9 +373,9 @@ func MergeJSON(
 
 	switch strategy {
 	case configtypes.MergeStrategyDeep, configtypes.MergeStrategyOverlay:
-		return DeepMerge(base, override)
+		return DeepMerge(base, override, opts)
 	case configtypes.MergeStrategyShallow:
-		return ShallowMerge(base, override)
+		return ShallowMerge(base, override, opts)
 	default:
 		return nil, errors.Wrapf(
 			ErrMergeUnknownStrategy,
@@ -367,12 +387,14 @@ func MergeJSON(
 
 // MergeYAML merges two YAML objects using the specified strategy.
 // YAML is converted to JSON internally, merged, then converted back.
+// If opts is non-nil, applies array merge strategies to arrays at matching paths.
 func MergeYAML(
 	base, override map[string]any,
 	strategy configtypes.MergeStrategy,
+	opts *MergeOptions,
 ) (map[string]any, error) {
 	// YAML and JSON have compatible data models, so we can use the same merge logic
-	return MergeJSON(base, override, strategy)
+	return MergeJSON(base, override, strategy, opts)
 }
 
 // ParseJSON parses JSON bytes into a map.
