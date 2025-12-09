@@ -126,11 +126,11 @@ jobs:
           type: files
           results_dir: results
           format: json
-          output_file: workflow-summary.json
+          output_file: summary-files.json
 
       - name: Upload workflow summary artifact
         uses: actions/upload-artifact@ea054086033fdfb9b1f127f5c0fb3f03a1906e2f # v4.6.1
         with:
           name: workflow-summary-files
-          path: workflow-summary.json
+          path: summary-files.json
           retention-days: 7

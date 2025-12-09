@@ -215,7 +215,7 @@ func readWorkflowSummaries(
 	log *logger.Logger,
 	resultsDir string,
 ) ([]*github.WorkflowSummary, error) {
-	pattern := filepath.Join(resultsDir, "workflow-summary-*.json")
+	pattern := filepath.Join(resultsDir, "summary-*.json")
 
 	files, err := filepath.Glob(pattern)
 	if err != nil {

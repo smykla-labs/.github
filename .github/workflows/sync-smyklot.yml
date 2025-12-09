@@ -227,11 +227,11 @@ jobs:
           type: smyklot
           results_dir: results
           format: json
-          output_file: workflow-summary.json
+          output_file: summary-smyklot.json
 
       - name: Upload workflow summary artifact
         uses: actions/upload-artifact@ea054086033fdfb9b1f127f5c0fb3f03a1906e2f # v4.6.1
         with:
           name: workflow-summary-smyklot
-          path: workflow-summary.json
+          path: summary-smyklot.json
           retention-days: 7
