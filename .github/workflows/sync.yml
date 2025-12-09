@@ -23,7 +23,7 @@ on:
         description: "Sync smyklot"
         required: false
         type: boolean
-        default: false
+        default: true
       dry_run:
         description: "Dry run (no changes)"
         required: false
