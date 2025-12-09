@@ -100,7 +100,7 @@ jobs:
           path: results
 
       - name: Flatten results directory
-        run: mv results/*/*.json results/ 2>/dev/null || true
+        run: mv results/labels-result-*/labels-result-*.json results/ 2>/dev/null || true
 
       - name: Generate markdown summary
         uses: ./

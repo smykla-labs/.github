@@ -104,7 +104,7 @@ inputs:
     required: false
     default: ""
   type:
-    description: Sync type for summary generation (labels, files, settings, smyklot, all)
+    description: Sync type for summary generation (labels, files, settings, smyklot, all) - inferred from result files if not provided
     required: false
     default: ""
   results_dir:

@@ -53,6 +53,17 @@ var summaryGenerateCmd = &cobra.Command{
 		filter, _ := cmd.Flags().GetString("filter")
 		dryRun := getPersistentBoolFlagWithEnvFallback(cmd, "dry-run")
 
+		// Infer sync type from result files if not provided
+		if syncType == "" {
+			inferredType, err := inferSyncType(log, resultsDir)
+			if err != nil {
+				return err
+			}
+
+			syncType = inferredType
+			log.Info("inferred sync type from result files", "type", syncType)
+		}
+
 		log.Info("generating summary",
 			"type", syncType,
 			"results_dir", resultsDir,
@@ -111,6 +122,41 @@ func generateSingleWorkflowSummary(
 	default:
 		return errors.Newf("unsupported format: %s", format)
 	}
+}
+
+// inferSyncType infers the sync type from result file names in the directory.
+func inferSyncType(log *logger.Logger, resultsDir string) (string, error) {
+	// Check for each type pattern
+	types := []string{syncTypeLabels, syncTypeFiles, syncTypeSettings, syncTypeSmyklot}
+
+	for _, syncType := range types {
+		pattern := filepath.Join(resultsDir, syncType+"-result-*.json")
+
+		files, err := filepath.Glob(pattern)
+		if err != nil {
+			return "", errors.Wrap(err, "globbing result files")
+		}
+
+		if len(files) > 0 {
+			log.Debug("found result files for type", "type", syncType, "count", len(files))
+			return syncType, nil
+		}
+	}
+
+	// Check if directory has workflow summary files (indicates "all" type)
+	summaryPattern := filepath.Join(resultsDir, "workflow-summary-*.json")
+
+	files, err := filepath.Glob(summaryPattern)
+	if err != nil {
+		return "", errors.Wrap(err, "globbing workflow summary files")
+	}
+
+	if len(files) > 0 {
+		log.Debug("found workflow summary files, using type 'all'", "count", len(files))
+		return syncTypeAll, nil
+	}
+
+	return "", errors.New("unable to infer sync type: no matching result files found")
 }
 
 // generateCrossWorkflowSummary generates consolidated summary from multiple workflows.

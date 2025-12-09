@@ -179,7 +179,7 @@ func SyncSmyklot(
 	if err != nil {
 		result.CompleteWithError(errors.Wrap(err, "creating or updating PR"))
 
-		return result, errors.Wrap(err, "creating or updating PR")
+		return result, err
 	}
 
 	result.PRNumber = prNumber
