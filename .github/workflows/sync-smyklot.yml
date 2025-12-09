@@ -209,6 +209,9 @@ jobs:
           pattern: smyklot-result-*
           path: results
 
+      - name: Flatten results directory
+        run: mv results/smyklot-result-*/smyklot-result-*.json results/ 2>/dev/null || true
+
       - name: Generate markdown summary
         uses: ./
         with:
@@ -228,6 +231,7 @@ jobs:
           results_dir: results
           format: json
           output_file: summary-smyklot.json
+          dry_run: ${{ inputs.dry_run || 'false' }}
 
       - name: Upload workflow summary artifact
         uses: actions/upload-artifact@ea054086033fdfb9b1f127f5c0fb3f03a1906e2f # v4.6.1

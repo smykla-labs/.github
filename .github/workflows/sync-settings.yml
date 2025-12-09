@@ -99,6 +99,9 @@ jobs:
           pattern: settings-result-*
           path: results
 
+      - name: Flatten results directory
+        run: mv results/*/*.json results/ 2>/dev/null || true
+
       - name: Generate markdown summary
         uses: ./
         with:
@@ -118,6 +121,7 @@ jobs:
           results_dir: results
           format: json
           output_file: summary-settings.json
+          dry_run: ${{ inputs.dry_run || 'false' }}
 
       - name: Upload workflow summary artifact
         uses: actions/upload-artifact@ea054086033fdfb9b1f127f5c0fb3f03a1906e2f # v4.6.1
