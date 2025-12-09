@@ -384,11 +384,8 @@ func generateMarkdown(
 	if len(results) > 0 {
 		builder.WriteString("## Repository Results\n\n")
 
-		for _, result := range results {
-			formatted := formatResult(syncType, result)
-			builder.WriteString(formatted)
-			builder.WriteString("\n")
-		}
+		formatted := formatResultsTable(syncType, results)
+		builder.WriteString(formatted)
 	}
 
 	// Write output
@@ -557,161 +554,230 @@ func writeWorkflowSections(
 		if len(filteredResults) > 0 {
 			builder.WriteString("### Repository Results\n\n")
 
-			for _, result := range filteredResults {
-				formatted := formatResult(summary.SyncType, result)
-				builder.WriteString(formatted)
-				builder.WriteString("\n")
-			}
+			formatted := formatResultsTable(summary.SyncType, filteredResults)
+			builder.WriteString(formatted)
 		}
 	}
 }
 
-// formatResult formats a single result based on sync type.
-func formatResult(syncType string, result any) string {
+// formatResultsTable formats results as a markdown table based on sync type.
+func formatResultsTable(syncType string, results []any) string {
 	switch syncType {
 	case syncTypeLabels:
-		if r, ok := result.(*github.LabelsSyncResult); ok {
-			return formatLabelsResult(r)
-		}
+		return formatLabelsTable(results)
 	case syncTypeFiles:
-		if r, ok := result.(*github.FilesSyncResult); ok {
-			return formatFilesResult(r)
-		}
+		return formatFilesTable(results)
 	case syncTypeSettings:
-		if r, ok := result.(*github.SettingsSyncResult); ok {
-			return formatSettingsResult(r)
-		}
+		return formatSettingsTable(results)
 	case syncTypeSmyklot:
-		if r, ok := result.(*github.SmyklotSyncResult); ok {
-			return formatSmyklotResult(r)
-		}
+		return formatSmyklotTable(results)
+	default:
+		return ""
 	}
-
-	return ""
 }
 
-// formatLabelsResult formats a labels sync result.
-func formatLabelsResult(result *github.LabelsSyncResult) string {
+// formatLabelsTable formats labels results as a markdown table.
+func formatLabelsTable(results []any) string {
 	var builder strings.Builder
 
-	statusEmoji := getStatusEmoji(result.Status)
-	fmt.Fprintf(&builder, "### %s %s\n\n", statusEmoji, result.Repo)
-	fmt.Fprintf(&builder, "**Status:** %s", result.Status)
+	builder.WriteString("| Repository | Status | Created | Updated | Deleted | Duration |\n")
+	builder.WriteString("|------------|--------|---------|---------|---------|----------|\n")
 
-	if result.Status == github.StatusSkipped {
-		fmt.Fprintf(&builder, " (%s)", result.SkippedReason)
+	for _, result := range results {
+		r, ok := result.(*github.LabelsSyncResult)
+		if !ok {
+			continue
+		}
+
+		statusEmoji := getStatusEmoji(r.Status)
+		status := fmt.Sprintf("%s %s", statusEmoji, r.Status)
+
+		if r.Status == github.StatusSkipped {
+			status = fmt.Sprintf("%s %s (%s)", statusEmoji, r.Status, r.SkippedReason)
+		} else if r.Status == github.StatusFailure && r.ErrorMessage != "" {
+			status = fmt.Sprintf("%s %s: %s", statusEmoji, r.Status, r.ErrorMessage)
+		}
+
+		fmt.Fprintf(&builder, "| %s | %s | %d | %d | %d | %s |\n",
+			r.Repo, status, r.Created, r.Updated, r.Deleted,
+			formatDuration(time.Duration(r.Duration)))
 	}
 
 	builder.WriteString("\n")
-
-	if result.Status == github.StatusSuccess {
-		fmt.Fprintf(&builder, "- Created: %d\n", result.Created)
-		fmt.Fprintf(&builder, "- Updated: %d\n", result.Updated)
-		fmt.Fprintf(&builder, "- Deleted: %d\n", result.Deleted)
-	}
-
-	if result.Status == github.StatusFailure && result.ErrorMessage != "" {
-		fmt.Fprintf(&builder, "- **Error:** %s\n", result.ErrorMessage)
-	}
-
-	fmt.Fprintf(&builder, "- Duration: %s\n", formatDuration(time.Duration(result.Duration)))
 
 	return builder.String()
 }
 
-// formatFilesResult formats a files sync result.
-func formatFilesResult(result *github.FilesSyncResult) string {
+// formatFilesTable formats files results as a markdown table.
+//
+//nolint:dupl // Similar table structure to formatSmyklotTable but different result types and fields
+func formatFilesTable(results []any) string {
 	var builder strings.Builder
 
-	statusEmoji := getStatusEmoji(result.Status)
-	fmt.Fprintf(&builder, "### %s %s\n\n", statusEmoji, result.Repo)
-	fmt.Fprintf(&builder, "**Status:** %s", result.Status)
+	builder.WriteString("| Repository | Status | Files Changed | PR | Duration |\n")
+	builder.WriteString("|------------|--------|---------------|----|---------|\n")
 
-	if result.Status == github.StatusSkipped {
-		fmt.Fprintf(&builder, " (%s)", result.SkippedReason)
+	for _, result := range results {
+		r, ok := result.(*github.FilesSyncResult)
+		if !ok {
+			continue
+		}
+
+		status := formatStatusWithError(r.Status, r.SkippedReason, r.ErrorMessage)
+		filesChanged := buildFilesChangedSummary(r.CreatedFiles, r.UpdatedFiles, r.DeletedFiles)
+		prLink := formatPRLink(r.PRURL, r.PRNumber)
+
+		fmt.Fprintf(&builder, "| %s | %s | %s | %s | %s |\n",
+			r.Repo, status, filesChanged, prLink,
+			formatDuration(time.Duration(r.Duration)))
 	}
 
 	builder.WriteString("\n")
-
-	if result.Status == github.StatusSuccess {
-		if result.PRURL != "" {
-			fmt.Fprintf(&builder, "- **PR:** [#%d](%s)\n", result.PRNumber, result.PRURL)
-		}
-
-		fmt.Fprintf(&builder, "- Created: %d files\n", len(result.CreatedFiles))
-		fmt.Fprintf(&builder, "- Updated: %d files\n", len(result.UpdatedFiles))
-		fmt.Fprintf(&builder, "- Deleted: %d files\n", len(result.DeletedFiles))
-
-		if result.HasDeletionsWarn {
-			builder.WriteString("- ⚠️ Contains deletions - review carefully\n")
-		}
-	}
-
-	if result.Status == github.StatusFailure && result.ErrorMessage != "" {
-		fmt.Fprintf(&builder, "- **Error:** %s\n", result.ErrorMessage)
-	}
-
-	fmt.Fprintf(&builder, "- Duration: %s\n", formatDuration(time.Duration(result.Duration)))
 
 	return builder.String()
 }
 
-// formatSettingsResult formats a settings sync result.
-func formatSettingsResult(result *github.SettingsSyncResult) string {
+// formatStatusWithError formats status with optional error or skipped reason.
+func formatStatusWithError(
+	status github.SyncStatus,
+	skippedReason string,
+	errorMessage string,
+) string {
+	statusEmoji := getStatusEmoji(status)
+	result := fmt.Sprintf("%s %s", statusEmoji, status)
+
+	if status == github.StatusSkipped {
+		return fmt.Sprintf("%s %s (%s)", statusEmoji, status, skippedReason)
+	}
+
+	if status == github.StatusFailure && errorMessage != "" {
+		return fmt.Sprintf("%s %s: %s", statusEmoji, status, errorMessage)
+	}
+
+	return result
+}
+
+// buildFilesChangedSummary builds a summary of file changes for display.
+func buildFilesChangedSummary(created []string, updated []string, deleted []string) string {
 	var builder strings.Builder
 
-	statusEmoji := getStatusEmoji(result.Status)
-	fmt.Fprintf(&builder, "### %s %s\n\n", statusEmoji, result.Repo)
-	fmt.Fprintf(&builder, "**Status:** %s", result.Status)
+	appendFileList(&builder, "**Created (%d):**<br/>", created)
+	appendFileList(&builder, "**Updated (%d):**<br/>", updated)
+	appendFileList(&builder, "**⚠️ Deleted (%d):**<br/>", deleted)
 
-	if result.Status == github.StatusSkipped {
-		fmt.Fprintf(&builder, " (%s)", result.SkippedReason)
+	if builder.Len() == 0 {
+		return "No changes"
 	}
-
-	builder.WriteString("\n")
-
-	if result.Status == github.StatusSuccess {
-		fmt.Fprintf(&builder, "- Changes applied: %d\n", result.ChangesApplied)
-	}
-
-	if result.Status == github.StatusFailure && result.ErrorMessage != "" {
-		fmt.Fprintf(&builder, "- **Error:** %s\n", result.ErrorMessage)
-	}
-
-	fmt.Fprintf(&builder, "- Duration: %s\n", formatDuration(time.Duration(result.Duration)))
 
 	return builder.String()
 }
 
-// formatSmyklotResult formats a smyklot sync result.
-func formatSmyklotResult(result *github.SmyklotSyncResult) string {
+// appendFileList appends a formatted file list to the builder.
+func appendFileList(builder *strings.Builder, header string, files []string) {
+	if len(files) == 0 {
+		return
+	}
+
+	if builder.Len() > 0 {
+		builder.WriteString("<br/>")
+	}
+
+	fmt.Fprintf(builder, header, len(files))
+
+	for _, f := range files {
+		fmt.Fprintf(builder, "• `%s`<br/>", f)
+	}
+}
+
+// formatPRLink formats a PR link if URL is present.
+func formatPRLink(prURL string, prNumber int) string {
+	if prURL == "" {
+		return "-"
+	}
+
+	return fmt.Sprintf("[#%d](%s)", prNumber, prURL)
+}
+
+// formatSettingsTable formats settings results as a markdown table.
+func formatSettingsTable(results []any) string {
 	var builder strings.Builder
 
-	statusEmoji := getStatusEmoji(result.Status)
-	fmt.Fprintf(&builder, "### %s %s\n\n", statusEmoji, result.Repo)
-	fmt.Fprintf(&builder, "**Status:** %s", result.Status)
+	builder.WriteString("| Repository | Status | Changes Applied | Duration |\n")
+	builder.WriteString("|------------|--------|-----------------|----------|\n")
 
-	if result.Status == github.StatusSkipped {
-		fmt.Fprintf(&builder, " (%s)", result.SkippedReason)
+	for _, result := range results {
+		r, ok := result.(*github.SettingsSyncResult)
+		if !ok {
+			continue
+		}
+
+		statusEmoji := getStatusEmoji(r.Status)
+		status := fmt.Sprintf("%s %s", statusEmoji, r.Status)
+
+		if r.Status == github.StatusSkipped {
+			status = fmt.Sprintf("%s %s (%s)", statusEmoji, r.Status, r.SkippedReason)
+		} else if r.Status == github.StatusFailure && r.ErrorMessage != "" {
+			status = fmt.Sprintf("%s %s: %s", statusEmoji, r.Status, r.ErrorMessage)
+		}
+
+		fmt.Fprintf(&builder, "| %s | %s | %d | %s |\n",
+			r.Repo, status, r.ChangesApplied,
+			formatDuration(time.Duration(r.Duration)))
 	}
 
 	builder.WriteString("\n")
 
-	if result.Status == github.StatusSuccess {
-		if result.PRURL != "" {
-			fmt.Fprintf(&builder, "- **PR:** [#%d](%s)\n", result.PRNumber, result.PRURL)
+	return builder.String()
+}
+
+// formatSmyklotTable formats smyklot results as a markdown table.
+//
+//nolint:dupl // Similar table structure to formatFilesTable but different result types and fields
+func formatSmyklotTable(results []any) string {
+	var builder strings.Builder
+
+	builder.WriteString("| Repository | Status | Workflows Changed | PR | Duration |\n")
+	builder.WriteString("|------------|--------|-------------------|----|---------|\n")
+
+	for _, result := range results {
+		r, ok := result.(*github.SmyklotSyncResult)
+		if !ok {
+			continue
 		}
 
-		fmt.Fprintf(&builder, "- Installed: %d workflows\n", len(result.InstalledFiles))
-		fmt.Fprintf(&builder, "- Replaced: %d workflows\n", len(result.ReplacedFiles))
-		fmt.Fprintf(&builder, "- Version-only: %d workflows\n", len(result.VersionOnlyFiles))
+		status := formatStatusWithError(r.Status, r.SkippedReason, r.ErrorMessage)
+		workflowsChanged := buildWorkflowsChangedSummary(
+			r.InstalledFiles,
+			r.ReplacedFiles,
+			r.VersionOnlyFiles,
+		)
+		prLink := formatPRLink(r.PRURL, r.PRNumber)
+
+		fmt.Fprintf(&builder, "| %s | %s | %s | %s | %s |\n",
+			r.Repo, status, workflowsChanged, prLink,
+			formatDuration(time.Duration(r.Duration)))
 	}
 
-	if result.Status == github.StatusFailure && result.ErrorMessage != "" {
-		fmt.Fprintf(&builder, "- **Error:** %s\n", result.ErrorMessage)
-	}
+	builder.WriteString("\n")
 
-	fmt.Fprintf(&builder, "- Duration: %s\n", formatDuration(time.Duration(result.Duration)))
+	return builder.String()
+}
+
+// buildWorkflowsChangedSummary builds a summary of workflow changes for display.
+func buildWorkflowsChangedSummary(
+	installed []string,
+	replaced []string,
+	versionOnly []string,
+) string {
+	var builder strings.Builder
+
+	appendFileList(&builder, "**Installed (%d):**<br/>", installed)
+	appendFileList(&builder, "**Replaced (%d):**<br/>", replaced)
+	appendFileList(&builder, "**Version-only (%d):**<br/>", versionOnly)
+
+	if builder.Len() == 0 {
+		return "No changes"
+	}
 
 	return builder.String()
 }
