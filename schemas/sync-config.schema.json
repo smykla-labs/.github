@@ -204,12 +204,11 @@
           "description": "Per-path array merge strategies. Maps JSONPath expressions (exact match only, e.g., \"$.packageRules\") to merge strategy (append/prepend/replace). Only applies to arrays in the merged result. If not specified, arrays are replaced (RFC 7396 default behavior)",
           "type": "object",
           "additionalProperties": {
-            "type": "string",
-            "enum": ["append", "prepend", "replace"]
+            "type": "string"
           }
         },
         "deduplicateArrays": {
-          "description": "Removes duplicate elements from arrays after applying array merge strategies. Uses deep equality comparison for objects. Has no effect if arrayStrategies is not configured",
+          "description": "When true, removes duplicate elements from arrays after merging using array strategies. Uses deep equality comparison for objects. Has no effect if arrayStrategies is not configured since arrays are replaced by default (RFC 7396).",
           "default": false,
           "type": "boolean"
         },
