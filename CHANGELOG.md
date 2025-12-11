@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.12.0](https://github.com/smykla-labs/.github/compare/dotsync/v1.11.0...dotsync/v1.12.0) (2025-12-11)
+
+### Features
+
+* **sync:** add array merge strategies ([#44](https://github.com/smykla-labs/.github/issues/44)) ([73e90a0](https://github.com/smykla-labs/.github/commit/73e90a00de3f7c93d687342b6362a443e28d8569))
+
+### Bug Fixes
+
+* **ci-sync:** add timeout to wait_for_run ([aa9f479](https://github.com/smykla-labs/.github/commit/aa9f479a3aa215d9db260e0ce7ffdc8662c1cd0b))
+* **ci-sync:** fix trigger race condition ([573cd45](https://github.com/smykla-labs/.github/commit/573cd4552421429b4b478e0ac5d39479b2517fc8))
+* **lint:** fix long lines in internal_test.go ([aea02b3](https://github.com/smykla-labs/.github/commit/aea02b38da70c6ee99f8e08d7d42068aec9697b6))
+
 ## [1.11.0](https://github.com/smykla-labs/.github/compare/dotsync/v1.10.3...dotsync/v1.11.0) (2025-12-09)
 
 ### Features
