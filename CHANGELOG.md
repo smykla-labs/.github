@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.12.1](https://github.com/smykla-labs/.github/compare/dotsync/v1.12.0...dotsync/v1.12.1) (2025-12-11)
+
+### Bug Fixes
+
+* **sync:** strip # from label colors for API ([3364757](https://github.com/smykla-labs/.github/commit/336475752f878c671a2776a7a64af820434c6b30))
+
 ## [1.12.0](https://github.com/smykla-labs/.github/compare/dotsync/v1.11.0...dotsync/v1.12.0) (2025-12-11)
 
 ### Features
