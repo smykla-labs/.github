@@ -289,9 +289,15 @@ func applyLabelChanges(
 ) error {
 	// Create new labels
 	for _, label := range toCreate {
+		// Strip # prefix from color for API (GitHub expects hex without #)
+		color := label.Color
+		if len(color) > 0 && color[0] == '#' {
+			color = color[1:]
+		}
+
 		ghLabel := &github.Label{
 			Name:        github.Ptr(label.Name),
-			Color:       github.Ptr(label.Color),
+			Color:       github.Ptr(color),
 			Description: github.Ptr(label.Description),
 		}
 
@@ -305,9 +311,15 @@ func applyLabelChanges(
 
 	// Update existing labels
 	for _, label := range toUpdate {
+		// Strip # prefix from color for API (GitHub expects hex without #)
+		color := label.Color
+		if len(color) > 0 && color[0] == '#' {
+			color = color[1:]
+		}
+
 		ghLabel := &github.Label{
 			Name:        github.Ptr(label.Name),
-			Color:       github.Ptr(label.Color),
+			Color:       github.Ptr(color),
 			Description: github.Ptr(label.Description),
 		}
 
