@@ -99,14 +99,26 @@ func TestSetValueAtPath(t *testing.T) {
 				obj:   map[string]any{"parent": map[string]any{"existing": "value"}},
 				path:  "$.parent.child",
 				value: "new",
-				want:  map[string]any{"parent": map[string]any{"existing": "value", "child": "new"}},
+				want: map[string]any{
+					"parent": map[string]any{
+						"existing": "value",
+						"child":    "new",
+					},
+				},
 			},
 			{
 				name:  "deeply nested",
 				obj:   map[string]any{"a": map[string]any{"b": map[string]any{"c": "old"}}},
 				path:  "$.a.b.d",
 				value: "new",
-				want:  map[string]any{"a": map[string]any{"b": map[string]any{"c": "old", "d": "new"}}},
+				want: map[string]any{
+					"a": map[string]any{
+						"b": map[string]any{
+							"c": "old",
+							"d": "new",
+						},
+					},
+				},
 			},
 		}
 
@@ -190,7 +202,11 @@ func TestSetValueAtPath(t *testing.T) {
 				}
 
 				if !contains(err.Error(), tt.wantErr) {
-					t.Errorf("setValueAtPath() error = %q, want error containing %q", err.Error(), tt.wantErr)
+					t.Errorf(
+						"setValueAtPath() error = %q, want error containing %q",
+						err.Error(),
+						tt.wantErr,
+					)
 				}
 			})
 		}
