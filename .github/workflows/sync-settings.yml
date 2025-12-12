@@ -15,6 +15,21 @@ on:
         required: false
         type: boolean
         default: false
+  workflow_call:
+    inputs:
+      repo:
+        description: "Single repository to sync (optional, syncs all if not provided)"
+        required: false
+        type: string
+        default: ""
+      dry_run:
+        description: "Dry run (no changes)"
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      SMYKLOT_APP_PRIVATE_KEY:
+        required: true
 
 permissions: {}
 
@@ -29,6 +44,7 @@ jobs:
 
       - name: Generate App Token
         id: token
+        if: inputs.repo == ''
         uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2.2.1
         with:
           app-id: ${{ vars.SMYKLOT_APP_ID }}
@@ -37,10 +53,9 @@ jobs:
 
       - name: Get repositories
         id: repos
-        uses: ./
+        uses: ./.github/actions/get-repos
         with:
-          command: repos
-          subcommand: list
+          repo: ${{ inputs.repo }}
           token: ${{ steps.token.outputs.token }}
 
   sync-settings:
