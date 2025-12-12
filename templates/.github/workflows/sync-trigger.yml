@@ -33,6 +33,8 @@ permissions: {}
 
 jobs:
   detect-and-trigger:
+    # Skip if triggered by sync bot (prevents infinite loops)
+    if: github.actor != 'smyklot[bot]'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
