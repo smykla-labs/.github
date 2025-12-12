@@ -1,6 +1,7 @@
 package github
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -111,7 +112,7 @@ func SyncFiles(
 
 	for _, mapping := range fileMappings {
 		fileChanges := processFileMapping(
-			ctx, log, client, org, repo, sourceRepo, mapping, syncConfig, stats,
+			ctx, log, client, org, repo, sourceRepo, defaultBranch, mapping, syncConfig, stats,
 		)
 		changes = append(changes, fileChanges...)
 	}
@@ -221,6 +222,7 @@ func processFileMapping(
 	org string,
 	repo string,
 	sourceRepo string,
+	defaultBranch string,
 	mapping FileMapping,
 	syncConfig *configtypes.SyncConfig,
 	stats *FileSyncStats,
@@ -243,6 +245,9 @@ func processFileMapping(
 
 		return nil
 	}
+
+	// Apply template replacements
+	sourceContent = renderFileTemplate(sourceContent, defaultBranch)
 
 	var changes []FileChange
 
@@ -1207,4 +1212,21 @@ func logFilesWithPrefix(log *logger.Logger, header string, prefix string, files 
 	for _, file := range files {
 		log.Info("  " + prefix + " " + file)
 	}
+}
+
+// renderFileTemplate replaces template placeholders in file content.
+//
+// Supported placeholders:
+//   - {{DEFAULT_BRANCH}} - replaced with the target repository's default branch
+//
+// Replacement is case-sensitive and exact-match only. If a placeholder is not
+// found, the content is returned unchanged. Multiple occurrences of the same
+// placeholder are all replaced. If defaultBranch is empty, content is returned
+// unchanged to avoid creating invalid references.
+func renderFileTemplate(content []byte, defaultBranch string) []byte {
+	if defaultBranch == "" {
+		return content
+	}
+
+	return bytes.ReplaceAll(content, []byte("{{DEFAULT_BRANCH}}"), []byte(defaultBranch))
 }
