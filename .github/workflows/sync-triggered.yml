@@ -41,6 +41,12 @@ jobs:
             exit 1
           fi
 
+          # Validate repository name format (defense in depth)
+          if [[ ! "$PAYLOAD_REPO" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+            echo "::error::Invalid repository name format"
+            exit 1
+          fi
+
           # Reject excluded repos
           if [[ "$PAYLOAD_REPO" == ".github" || "$PAYLOAD_REPO" == "smyklot" ]]; then
             echo "::error::Repository '$PAYLOAD_REPO' is excluded from sync"

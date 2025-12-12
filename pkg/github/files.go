@@ -1214,7 +1214,13 @@ func logFilesWithPrefix(log *logger.Logger, header string, prefix string, files 
 }
 
 // renderFileTemplate replaces template placeholders in file content.
-// Supports: {{DEFAULT_BRANCH}}
+//
+// Supported placeholders:
+//   - {{DEFAULT_BRANCH}} - replaced with the target repository's default branch
+//
+// Replacement is case-sensitive and exact-match only. If a placeholder is not
+// found, the content is returned unchanged. Multiple occurrences of the same
+// placeholder are all replaced.
 func renderFileTemplate(content []byte, defaultBranch string) []byte {
 	rendered := string(content)
 	rendered = strings.ReplaceAll(rendered, "{{DEFAULT_BRANCH}}", defaultBranch)
